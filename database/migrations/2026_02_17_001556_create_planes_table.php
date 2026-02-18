@@ -16,6 +16,8 @@ return new class extends Migration
         Schema::create('planes', function (Blueprint $table) {
             $table->id();
             $table->string('nombre');
+            $table->string('precio');
+            $table->string('descripcion');
             $table->string('limite_citas_mes')->nullable();
             $table->string('limite_servicios')->nullable();
             $table->string('intervalo_citas_minutos');
@@ -29,6 +31,8 @@ return new class extends Migration
         DB::table('planes')->insert([
             [
                 'nombre' => 'Basico',
+                'precio' => '100',
+                'descripcion' => 'El basico',
                 'limite_citas_mes' => 100,
                 'limite_servicios' => 5,
                 'intervalo_citas_minutos' => 20,
@@ -41,6 +45,8 @@ return new class extends Migration
             ],
             [
                 'nombre' => 'Medio',
+                'precio' => '200',
+                'descripcion' => 'El medio',
                 'limite_citas_mes' => 500,
                 'limite_servicios' => 15,
                 'intervalo_citas_minutos' => 5,
@@ -53,6 +59,8 @@ return new class extends Migration
             ],
             [
                 'nombre' => 'Avanzado',
+                'precio' => '500',
+                'descripcion' => 'El perro',
                 'limite_citas_mes' => null, //Infinitas
                 'limite_servicios' => null, //Infinitas
                 'intervalo_citas_minutos' => 1,

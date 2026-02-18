@@ -1,12 +1,15 @@
-<template>
-    <div>
-        <h1>AgendaVB 🚀</h1>
-        <p>Vue 3 funcionando correctamente</p>
-    </div>
-</template>
+<script setup>
 
-<script>
-export default {
-    name: "App"
-}
+import Navbar from './componentes/Navbar.vue'
+import Planes from './componentes/Planes.vue'
+import Footer from './componentes/Footer.vue'
 </script>
+
+<template>
+
+    <Navbar/>
+    <Planes/>
+    <Footer/>
+
+
+</template>
