@@ -1,8 +1,19 @@
 <script setup>
 
+import {useRouter} from 'vue-router'
+const router = useRouter()
+
 const props = defineProps({
     plan: Object
 })
+
+const planSeleccionado = () => {
+    //guardar el plan en localStorage
+    localStorage.setItem('planSeleccionado', JSON.stringify(props.plan))
+
+    //redireccionar al login
+    router.push('/login')
+}
 
 </script>
 
@@ -45,7 +56,7 @@ const props = defineProps({
 
             <div class="card-footer bg-white border-0">
 
-                <button class="btn btn-primary w-100">
+                <button @click="planSeleccionado" class="btn btn-primary w-100">
                     Seleccionar plan
                 </button>
 

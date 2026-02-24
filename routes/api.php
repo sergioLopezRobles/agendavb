@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\api\AuthController;
 use App\Http\Controllers\plan\PlanController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -21,3 +22,11 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::get('/planes',[PlanController::class,'verplanes'])->name('plan.verplanes');
+
+Route::post('/register',[AuthController::class,'register']);
+Route::post('/login',[AuthController::class,'login']);
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/user',[AuthController::class,'user']);
+    Route::post('/logout',[AuthController::class,'logout']);
+});
