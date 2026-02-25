@@ -1,14 +1,42 @@
 <script setup>
-
 import { ref } from 'vue'
-import { useRouter} from 'vue-router'
+import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
 const email = ref('')
 const password = ref('')
 
+const emailError = ref('')
+const passwordError = ref('')
+
+const validar = () => {
+    let valido = true
+    emailError.value = ''
+    passwordError.value = ''
+
+    if (!email.value) {
+        emailError.value = 'El correo electrónico es obligatorio.'
+        valido = false
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+        emailError.value = 'Ingresa un formato de correo válido.'
+        valido = false
+    }
+
+    if (!password.value) {
+        passwordError.value = 'La contraseña es obligatoria.'
+        valido = false
+    } else if (password.value.length < 6) {
+        passwordError.value = 'La contraseña debe tener al menos 6 caracteres.'
+        valido = false
+    }
+
+    return valido
+}
+
 const login = async () => {
+    if (!validar()) return
+
     const response = await fetch('/api/login',{
         method: 'POST',
         headers: {
@@ -31,28 +59,73 @@ const login = async () => {
 </script>
 
 <template>
+    <div class="container min-vh-100 d-flex justify-content-center align-items-center">
 
-    <div class="container mt-5">
+        <div class="col-md-6 col-lg-5 w-40">
+            <div class="card shadow-lg border-0 rounded-4">
+                <div class="card-body p-5"> <div class="text-center mb-4">
+                    <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center" style="width: 80px; height: 80px;">
+                        <span class="fs-1">🏢</span>
+                    </div>
+                </div>
 
-        <h2>Login</h2>
+                    <h2 class="text-center text-primary fw-bold mb-2">Bienvenido</h2>
+                    <p class="text-center text-muted mb-5">Ingresa a tu cuenta para continuar</p>
 
-        <input v-model="email" class="form-control mb-2" placeholder="Email">
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Correo Electrónico</label>
+                        <input
+                            v-model="email"
+                            type="email"
+                            class="form-control form-control-lg"
+                            :class="{ 'is-invalid': emailError }"
+                            placeholder="ejemplo@correo.com"
+                        >
+                        <div class="invalid-feedback">
+                            {{ emailError }}
+                        </div>
+                    </div>
 
-        <input v-model="password" type="password" class="form-control mb-2" placeholder="Password">
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between">
+                            <label class="form-label fw-semibold">Contraseña</label>
+                            <a href="#" class="text-decoration-none small text-primary fw-semibold">¿Olvidaste tu contraseña?</a>
+                        </div>
+                        <input
+                            v-model="password"
+                            type="password"
+                            class="form-control form-control-lg"
+                            :class="{ 'is-invalid': passwordError }"
+                            placeholder="Ingresa tu contraseña aquí"
+                        >
+                        <div class="invalid-feedback">
+                            {{ passwordError }}
+                        </div>
+                    </div>
 
-        <button @click="login" class="btn btn-primary">
-            Login
-        </button>
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="recordarme">
+                        <label class="form-check-label text-muted" for="recordarme">
+                            Recordarme en este dispositivo
+                        </label>
+                    </div>
 
-        <p class="mt-3">
+                    <button @click="login" class="btn btn-primary w-100 py-3 fw-bold fs-5 mb-4 rounded-3">
+                        Iniciar Sesión
+                    </button>
 
-            ¿No tienes cuenta?
+                    <div class="text-center">
+                        <p class="mb-0 text-muted">
+                            ¿No tienes cuenta?
+                            <router-link to="/register" class="text-decoration-none fw-bold text-primary">
+                                Registrarse
+                            </router-link>
+                        </p>
+                    </div>
 
-            <router-link to="/register">
-                Registrarse
-            </router-link>
-
-        </p>
+                </div>
+            </div>
+        </div>
 
     </div>
 
