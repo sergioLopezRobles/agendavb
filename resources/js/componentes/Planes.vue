@@ -3,6 +3,7 @@
 import { ref, onMounted} from 'vue'
 
 import PlanCard from './PlanCard.vue'
+import Navbar from './Navbar.vue'
 
 const planes = ref([])
 
@@ -14,6 +15,8 @@ onMounted(async () => {
 </script>
 
 <template>
+
+    <navbar/>
 
     <div class="bg-light min-vh-100 py-5">
         <div class="container py-4">

@@ -16,6 +16,7 @@ const validar = () => {
     passwordError.value = ''
 
     if (!email.value) {
+        window.$toast.show('El correo electrónico es obligatorio ', 'warning', 5000)
         emailError.value = 'El correo electrónico es obligatorio.'
         valido = false
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
@@ -52,6 +53,7 @@ const login = async () => {
 
     if(data.token){
         localStorage.setItem('token', data.token)
+        window.$toast.show('Bienvenido '  + data.user.name, 'success', 5000)
         router.push('/dashboard')
     }
 

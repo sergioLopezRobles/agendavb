@@ -1,8 +1,24 @@
 <script setup>
 
 import { useRouter } from 'vue-router'
+import {onMounted, ref} from "vue";
+import PlanCard from "../componentes/PlanCard.vue";
 
 const router = useRouter()
+
+const planes = ref([])
+
+onMounted(async () => {
+    const planGuardado = JSON.parse(localStorage.getItem('planSeleccionado'))
+    if(planGuardado){
+        console.log(planGuardado)
+        planes.value = [planGuardado]
+    }else {
+        const response = await fetch('/api/planes')
+        planes.value = await response.json()
+        console.log(planes)
+    }
+})
 
 const logout = async () => {
     const token = localStorage.getItem('token')
@@ -30,14 +46,10 @@ const logout = async () => {
 
 }
 
-const plan = JSON.parse(localStorage.getItem('planSeleccionado'))
-console.log('nombreplan: ' + plan.nombre )
-console.log('precioplan: ' + plan.precio)
 </script>
 
 <template>
     <div class="bg-light min-vh-100">
-
         <nav class="navbar navbar-expand-lg bg-primary shadow-sm px-4 py-3">
             <div class="container-fluid d-flex justify-content-between align-items-center">
 
@@ -58,7 +70,7 @@ console.log('precioplan: ' + plan.precio)
 
         <div class="container mt-5 pt-4">
             <div class="row justify-content-center">
-                <div class="col-md-8 col-lg-6">
+                <div>
 
                     <div class="card shadow-lg border-0 rounded-4 text-center mb-4">
                         <div class="card-body p-5">
@@ -77,33 +89,35 @@ console.log('precioplan: ' + plan.precio)
                     </div>
 
                     <div v-if="plan" class="card shadow-sm border-0 rounded-4">
-                        <div class="card-body p-4">
-                            <h5 class="text-muted fw-bold mb-3 d-flex align-items-center">
-                                <span class="me-2">📦</span> Tu plan actual
-                            </h5>
+                        <div class="container py-4">
 
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h3 class="fw-bold text-dark mb-1">{{ plan.nombre }}</h3>
-                                    <p class="text-secondary mb-0">
-                                        Intervalo: {{ plan.intervalo_citas_minutos }} min
-                                    </p>
-                                </div>
-                                <div class="text-end">
-                                    <h2 class="text-primary fw-bold mb-0">${{ plan.precio }}</h2>
-                                    <small class="text-muted">/mes</small>
-                                </div>
+                            <div class="row g-4 justify-content-center">
+
+                                <PlanCard
+                                    v-for="plan in planes"
+                                    :key="plan.id"
+                                    :plan="plan"
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div v-else class="alert alert-warning border-0 shadow-sm rounded-4 mt-4" role="alert">
-                        Aún no has seleccionado ningún plan.
-                    </div>
+                    <div v-else>
+                        <div class="container py-4">
 
+                            <div class="row g-4 justify-content-center">
+
+                                <PlanCard
+                                    v-for="plan in planes"
+                                    :key="plan.id"
+                                    :plan="plan"
+                                />
+
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
     </div>
 </template>
