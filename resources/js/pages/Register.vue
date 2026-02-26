@@ -70,8 +70,15 @@ const register = async () => {
 
     const data = await response.json()
 
-    localStorage.setItem('token', data.token)
-    router.push('/dashboard')
+    if(data.valid){
+        //registro exitoso
+        window.$toast.show(data.message, 'success', 5000)
+        localStorage.setItem('token', data.token)
+        router.push('/dashboard')
+    }else{
+        //registro no exitoso
+        window.$toast.show(data.message, 'warning', 5000)
+    }
 }
 </script>
 

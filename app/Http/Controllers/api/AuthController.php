@@ -5,11 +5,26 @@ namespace App\Http\Controllers\api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
     public function register(Request $request){
+
+        $existeCorreo = DB::select("SELECT email FROM users WHERE email = '$request->email'");
+
+        if($existeCorreo != null){
+            //existe correo electronico
+            Log::info('entro');
+            return response()->json([
+                'valid' => false,
+                'message' => 'El correo ya existe'
+            ]);
+        }
+        Log::info('entro 2');
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
@@ -19,6 +34,8 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'valid' => true,
+            'message' => 'Registro exitoso',
             'user' => $user,
             'token' => $token
         ]);
