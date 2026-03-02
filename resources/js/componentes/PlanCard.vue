@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 
 const router = useRouter()
 const planGuardado = JSON.parse(localStorage.getItem('planSeleccionado'))
@@ -12,25 +12,35 @@ const props = defineProps({
 
 const mostrarModal = ref(false)
 
-// Estado del formulario para la tabla negocios
+// Variables para el flujo de verificación
+const codigoEnviado = ref(false)
+const numeroVerificado = ref(false)
+
+// Estado del formulario
 const formulario = reactive({
     nombre: '',
     telefono: '',
-    email: '',
+    email: '', // Se llenará con el correo del usuario logueado
     hora_inicio: '',
-    hora_fin: ''
+    hora_fin: '',
+    codigo_verificacion: ''
 })
 
 const errores = reactive({})
 
+// Intentamos cargar el email del usuario cuando se monta el componente
+onMounted(() => {
+    // Aquí es donde busca el correo en la memoria del navegador.
+    // Una vez que arreglemos tu Login.vue, esto funcionará solo.
+    const userEmail = localStorage.getItem('userEmail')
+    formulario.email = userEmail ? userEmail : ''
+})
+
 const eventPlanSeleccionado = () => {
-    console.log(token)
     if(token.value != null){
         abrirModal()
     } else {
-        //guardar el plan en localStorage
         localStorage.setItem('planSeleccionado', JSON.stringify(props.plan))
-        //redireccionar al login
         router.push('/login')
     }
 }
@@ -47,11 +57,77 @@ const cerrarModal = () => {
 const limpiarFormulario = () => {
     formulario.nombre = ''
     formulario.telefono = ''
-    formulario.email = ''
     formulario.hora_inicio = ''
     formulario.hora_fin = ''
+    formulario.codigo_verificacion = ''
+    codigoEnviado.value = false
+    numeroVerificado.value = false
     Object.keys(errores).forEach(key => delete errores[key])
 }
+
+// --- CONEXIÓN REAL CON TWILIO ---
+const enviarCodigo = async () => {
+    if (formulario.telefono.length === 10) {
+        // Ponemos el botón en estado de carga (opcional, visual)
+        window.$toast.show('Enviando SMS...', 'info', 2000)
+
+        try {
+            const response = await fetch('/api/enviar-codigo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token.value}` // Mandamos el token si la ruta está protegida
+                },
+                body: JSON.stringify({ telefono: formulario.telefono })
+            })
+
+            const data = await response.json()
+
+            if (response.ok && data.success) {
+                codigoEnviado.value = true
+                window.$toast.show('Código enviado con éxito', 'success', 3000)
+            } else {
+                window.$toast.show('Error: ' + data.message, 'danger', 4000)
+            }
+        } catch (error) {
+            window.$toast.show('Error al conectar con el servidor', 'danger', 4000)
+            console.error(error)
+        }
+    }
+}
+
+const confirmarCodigo = async () => {
+    if (formulario.codigo_verificacion.length === 6) {
+        try {
+            const response = await fetch('/api/verificar-codigo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token.value}`
+                },
+                body: JSON.stringify({
+                    telefono: formulario.telefono,
+                    codigo: formulario.codigo_verificacion
+                })
+            })
+
+            const data = await response.json()
+
+            if (response.ok && data.success) {
+                numeroVerificado.value = true
+                codigoEnviado.value = false
+                errores.telefono = null
+                window.$toast.show('Número verificado correctamente', 'success', 3000)
+            } else {
+                window.$toast.show('Código incorrecto, intenta de nuevo', 'warning', 4000)
+            }
+        } catch (error) {
+            window.$toast.show('Error al conectar con el servidor', 'danger', 4000)
+            console.error(error)
+        }
+    }
+}
+// ---------------------------------------
 
 const validarFormulario = () => {
     Object.keys(errores).forEach(key => delete errores[key])
@@ -62,19 +138,13 @@ const validarFormulario = () => {
         esValido = false
     }
 
-    if (!formulario.telefono.trim()) {
-        errores.telefono = 'El teléfono es obligatorio.'
-        esValido = false
-    } else if (!/^\d{10}$/.test(formulario.telefono.replace(/\D/g, ''))) {
-        errores.telefono = 'Debe contener 10 dígitos numéricos.'
+    if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
+        errores.telefono = 'Debe contener exactamente 10 dígitos numéricos.'
         esValido = false
     }
 
-    if (!formulario.email.trim()) {
-        errores.email = 'El correo es obligatorio.'
-        esValido = false
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formulario.email)) {
-        errores.email = 'Ingresa un correo electrónico válido.'
+    if (!numeroVerificado.value) {
+        errores.telefono = 'Debes verificar el número de teléfono para continuar.'
         esValido = false
     }
 
@@ -96,10 +166,7 @@ const validarFormulario = () => {
 
 const registrarNegocio = () => {
     if (validarFormulario()) {
-        // TODO: Aquí se agrega la petición real al backend
-        console.log('Validación exitosa del front. Datos listos:', formulario)
 
-        // Puedes llamar aquí a tu función axios/fetch y luego cerrar el modal
         // cerrarModal()
     }
 }
@@ -190,44 +257,81 @@ const registrarNegocio = () => {
 
                     <form @submit.prevent="registrarNegocio">
 
-                        <div class="mb-4">
+                        <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
                             <input
                                 type="text"
                                 v-model="formulario.nombre"
                                 class="form-control form-control-lg bg-light border-0 shadow-sm"
                                 :class="{ 'is-invalid': errores.nombre }"
-                                placeholder="Ej. Optica Vista Boreal"
+                                placeholder="Ej. Clínica Dental Vista Boreal"
                             >
                             <div class="invalid-feedback fw-medium">{{ errores.nombre }}</div>
                         </div>
 
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Teléfono</label>
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold text-secondary">Correo Electrónico (Titular)</label>
+                            <input
+                                type="email"
+                                v-model="formulario.email"
+                                class="form-control form-control-lg text-muted shadow-none"
+                                style="background-color: #e9ecef; border: 1px solid #dee2e6;"
+                                disabled
+                            >
+                            <small class="text-muted mt-1 d-block">Este correo está vinculado a tu cuenta de usuario.</small>
+                        </div>
+
+                        <!--<div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Teléfono de Notificaciones (WhatsApp)</label>
+
+                            <div class="input-group input-group-lg shadow-sm">
                                 <input
                                     type="tel"
                                     v-model="formulario.telefono"
-                                    class="form-control form-control-lg bg-light border-0 shadow-sm"
+                                    class="form-control bg-light border-0"
                                     :class="{ 'is-invalid': errores.telefono }"
                                     placeholder="10 dígitos"
+                                    maxlength="10"
+                                    :disabled="numeroVerificado"
+                                    @input="formulario.telefono = formulario.telefono.replace(/\D/g, '')"
                                 >
-                                <div class="invalid-feedback fw-medium">{{ errores.telefono }}</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Correo Electrónico</label>
-                                <input
-                                    type="email"
-                                    v-model="formulario.email"
-                                    class="form-control form-control-lg bg-light border-0 shadow-sm"
-                                    :class="{ 'is-invalid': errores.email }"
-                                    placeholder="contacto@negocio.com"
+                                <button
+                                    class="btn fw-bold px-4"
+                                    :class="numeroVerificado ? 'btn-success' : 'btn-outline-primary bg-white'"
+                                    type="button"
+                                    @click="enviarCodigo"
+                                    :disabled="formulario.telefono.length !== 10 || numeroVerificado"
                                 >
-                                <div class="invalid-feedback fw-medium">{{ errores.email }}</div>
+                                    {{ numeroVerificado ? '✅ Verificado' : 'Verificar' }}
+                                </button>
                             </div>
+                            <div class="text-danger small mt-1 fw-medium" v-if="errores.telefono">{{ errores.telefono }}</div>
                         </div>
 
-                        <div class="row g-3">
+                        <div v-if="codigoEnviado" class="mb-4 p-3 bg-primary bg-opacity-10 rounded-3 border border-primary border-opacity-25">
+                            <label class="form-label fw-bold text-primary">Ingresa el código que enviamos por SMS</label>
+                            <div class="input-group input-group-lg shadow-sm">
+                                <input
+                                    type="text"
+                                    v-model="formulario.codigo_verificacion"
+                                    class="form-control bg-white border-0 text-center fw-bold text-primary"
+                                    placeholder="------"
+                                    maxlength="6"
+                                    @input="formulario.codigo_verificacion = formulario.codigo_verificacion.replace(/\D/g, '')"
+                                >
+                                <button
+                                    class="btn btn-primary fw-bold px-4"
+                                    type="button"
+                                    @click="confirmarCodigo"
+                                    :disabled="formulario.codigo_verificacion.length !== 6"
+                                >
+                                    Confirmar
+                                </button>
+                            </div>
+                            <small class="text-muted mt-2 d-block">Demo: Para probar, escribe 6 números cualesquiera.</small>
+                        </div>-->
+
+                        <div class="row g-3 mt-2">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-secondary">Hora de Apertura</label>
                                 <input
@@ -254,11 +358,12 @@ const registrarNegocio = () => {
 
                 </div>
 
-                <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-between">
-                    <button type="button" class="btn btn-light fw-semibold px-4 rounded-pill" @click="cerrarModal">
-                        Cancelar
-                    </button>
-                    <button type="button" class="btn btn-primary fw-bold px-4 rounded-pill shadow-sm d-flex align-items-center" @click="registrarNegocio">
+                <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-center">
+                    <button
+                        type="button"
+                        class="btn btn-primary fw-bold px-5 py-2 rounded-pill shadow-sm d-flex align-items-center"
+                        @click="registrarNegocio">
+                        <!--:disabled="!numeroVerificado"-->
                         <span class="me-2">💾</span> Finalizar Registro
                     </button>
                 </div>

@@ -41,6 +41,7 @@ const logout = async () => {
 
     // borrar token del navegador
     localStorage.removeItem('token')
+    localStorage.removeItem('userEmail')
     localStorage.removeItem('planSeleccionado')
 
     // redirigir al inicio

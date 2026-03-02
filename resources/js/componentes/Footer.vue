@@ -44,8 +44,6 @@
                         <p class="text-muted">
                             Plataforma integral multiplataforma orientada a la gestión de usuarios,
                             control de accesos y administración de una agenda digital interactiva.
-                            Optimizamos la atención con confirmaciones automáticas vía WhatsApp
-                            y pagos seguros mediante Stripe.
                         </p>
                     </div>
                 </div>

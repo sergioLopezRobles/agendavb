@@ -53,10 +53,12 @@ const login = async () => {
 
     if(data.token){
         localStorage.setItem('token', data.token)
+        // 👇 ESTA ES LA LÍNEA NUEVA MAGICA 👇
+        localStorage.setItem('userEmail', email.value)
+
         window.$toast.show('Bienvenido '  + data.user.name, 'success', 5000)
         router.push('/dashboard')
     }
-
 }
 </script>
 
