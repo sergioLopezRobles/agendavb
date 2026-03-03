@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\api\AuthController;
 use App\Http\Controllers\api\TwilioController;
+use App\Http\Controllers\dashboard\DashboardController;
 use App\Http\Controllers\plan\PlanController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -33,4 +34,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Rutas de Twilio
     Route::post('/enviar-codigo', [TwilioController::class, 'enviarCodigo']);
     Route::post('/verificar-codigo', [TwilioController::class, 'verificarCodigo']);
+
+    //ruta dashboard
+    Route::get('/dashboard',[DashboardController::class,'index']);
+    Route::post('/registrar-plan-negocio', [DashboardController::class, 'registrarPlanNegocio']);
 });

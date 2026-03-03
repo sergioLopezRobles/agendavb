@@ -4,15 +4,22 @@ import { onMounted, ref } from "vue";
 import PlanCard from "../componentes/PlanCard.vue";
 
 const router = useRouter()
-
+const token = ref(localStorage.getItem('token'))
 const planes = ref([])
 const isSidebarExpanded = ref(true)
+
+const planAdquirido = ref(null)
+const usuarioLoggeado = ref(null)
 
 const toggleSidebar = () => {
     isSidebarExpanded.value = !isSidebarExpanded.value
 }
 
 onMounted(async () => {
+    cargarDashboard()
+})
+
+const cargarDashboard = async()  => {
     const planGuardado = JSON.parse(localStorage.getItem('planSeleccionado'))
     if(planGuardado){
         console.log(planGuardado)
@@ -22,7 +29,31 @@ onMounted(async () => {
         planes.value = await response.json()
         console.log(planes)
     }
-})
+
+    try{
+        const response = await fetch('/api/dashboard',{
+            method: 'GET',
+            headers: {
+                'Content-Type' : 'application/json',
+                // Es vital enviar el token para que el middleware auth:sanctum te deje pasar
+                'Authorization': `Bearer ${token.value}`
+            }
+        })
+
+        const data = await response.json()
+
+        if(data.valid){
+            usuarioLoggeado.value = data.usuarioLoggeado
+            console.log(usuarioLoggeado)
+            planAdquirido.value = data.planAdquirido
+        }
+
+    }catch (error) {
+        console.error("Error en la petición:", error)
+        window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
+    }
+}
+
 
 const logout = async () => {
     const token = localStorage.getItem('token')
@@ -66,28 +97,31 @@ const logout = async () => {
                         <span class="menu-text fw-semibold">Dashboard</span>
                     </a>
                 </li>
-                <li class="nav-item mt-2 pt-2 border-top">
+
+                <li v-if="planAdquirido" class="nav-item mt-2 pt-2 border-top">
                     <small class="text-muted fw-bold ms-3 menu-text d-block mb-2">MÓDULOS</small>
                 </li>
-                <li class="nav-item">
+
+                <li v-if="planAdquirido" class="nav-item">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-5 me-3">📆</span>
                         <span class="menu-text fw-medium">Agenda Digital</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li v-if="planAdquirido" class="nav-item">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-5 me-3">👥</span>
                         <span class="menu-text fw-medium">Usuarios y Roles</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li v-if="planAdquirido" class="nav-item">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-5 me-3">💬</span>
                         <span class="menu-text fw-medium">Notificaciones WA</span>
                     </a>
                 </li>
-                <li class="nav-item">
+
+                <li class="nav-item" :class="{ 'mt-2 pt-2 border-top': !planAdquirido }">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-5 me-3">💳</span>
                         <span class="menu-text fw-medium">Membresías</span>
@@ -108,7 +142,7 @@ const logout = async () => {
                         </button>
 
                         <div class="d-none d-md-block">
-                            <h4 class="mb-1 fw-bold text-dark">Buenos días, <span class="text-primary">Administrador</span></h4>
+                            <h4 class="mb-1 fw-bold text-dark">Buenos días, <span class="text-primary">{{ usuarioLoggeado?.name || 'Administrador' }}</span></h4>
                             <p class="text-muted small mb-0">Tu resumen de rendimiento del sistema</p>
                         </div>
                     </div>
@@ -131,12 +165,12 @@ const logout = async () => {
 
                         <div class="dropdown ms-2">
                             <button class="btn border-0 p-0 rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img src="https://ui-avatars.com/api/?name=Admin&background=0D6EFD&color=fff" alt="Perfil" class="rounded-circle shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
+                                <img :src="`https://ui-avatars.com/api/?name=${usuarioLoggeado?.name || 'Admin'}&background=0D6EFD&color=fff`" alt="Perfil" class="rounded-circle shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2 rounded-4" style="min-width: 200px;">
                                 <li class="px-3 py-2">
-                                    <span class="fw-bold text-dark d-block">Administrador</span>
-                                    <small class="text-muted">admin@vistaboreal.com</small>
+                                    <span class="fw-bold text-dark d-block">{{ usuarioLoggeado?.name || 'Administrador' }}</span>
+                                    <small class="text-muted">{{ usuarioLoggeado?.email || '' }}</small>
                                 </li>
                                 <li><hr class="dropdown-divider my-2"></li>
                                 <li><a class="dropdown-item rounded-3 py-2" href="#">👤 Mi Perfil</a></li>
@@ -157,88 +191,93 @@ const logout = async () => {
 
             <main class="p-4 p-lg-5 overflow-auto h-100">
 
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h5 class="fw-bold mb-0 text-dark">Vista General</h5>
-                    <button class="btn btn-outline-primary rounded-pill px-4 shadow-sm fw-semibold ">
-                        <span class="me-1">+</span> Nueva Cita
-                    </button>
-                </div>
-
-                <div class="row g-4 mb-5">
-                    <div class="col-md-6 col-lg-3">
-                        <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-primary">
-                            <div class="card-body">
-                                <h6 class="text-muted fw-bold mb-2">Citas Hoy</h6>
-                                <h3 class="fw-bold mb-0">12</h3>
-                                <small class="text-primary fw-semibold d-flex align-items-center mt-2">
-                                    <span class="me-1">📈</span> +2% desde ayer
-                                </small>
-                            </div>
-                        </div>
+                <div v-if="planAdquirido">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold mb-0 text-dark">Vista General</h5>
+                        <button class="btn btn-outline-primary rounded-pill px-4 shadow-sm fw-semibold ">
+                            <span class="me-1">+</span> Nueva Cita
+                        </button>
                     </div>
 
-                    <div class="col-md-6 col-lg-3">
-                        <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-warning">
-                            <div class="card-body">
-                                <h6 class="text-muted fw-bold mb-2">Usuarios Activos</h6>
-                                <h3 class="fw-bold mb-0">5</h3>
-                                <small class="text-muted fw-semibold d-flex align-items-center mt-2">
-                                    <span class="me-1">👥</span> Personal en turno
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 col-lg-3">
-                        <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-success">
-                            <div class="card-body">
-                                <h6 class="text-muted fw-bold mb-2">Créditos WA</h6>
-                                <h3 class="fw-bold mb-0">450</h3>
-                                <small class="text-success fw-semibold d-flex align-items-center mt-2">
-                                    <span class="me-1">💬</span> Suficiente para 7 días
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6 col-lg-3">
-                        <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-info">
-                            <div class="card-body">
-                                <h6 class="text-muted fw-bold mb-2">Plan Stripe</h6>
-                                <h3 class="fw-bold mb-0 text-dark">Activo</h3>
-                                <small class="text-info fw-semibold d-flex align-items-center mt-2">
-                                    <span class="me-1">💳</span> Próx. cobro 24 Jun
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <h5 class="fw-bold mb-4 text-dark">Tu Configuración de Plan</h5>
-
-                <div class="row">
-                    <div class="col-12">
-                        <div v-if="plan" class="card shadow-sm border-0 rounded-4 bg-transparent">
-                            <div class="row g-4">
-                                <PlanCard
-                                    v-for="plan in planes"
-                                    :key="plan.id"
-                                    :plan="plan"
-                                />
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-primary">
+                                <div class="card-body">
+                                    <h6 class="text-muted fw-bold mb-2">Citas Hoy</h6>
+                                    <h3 class="fw-bold mb-0">12</h3>
+                                    <small class="text-primary fw-semibold d-flex align-items-center mt-2">
+                                        <span class="me-1">📈</span> +2% desde ayer
+                                    </small>
+                                </div>
                             </div>
                         </div>
 
-                        <div v-else class="card shadow-sm border-0 rounded-4 bg-transparent">
-                            <div class="row g-4">
-                                <PlanCard
-                                    v-for="plan in planes"
-                                    :key="plan.id"
-                                    :plan="plan"
-                                />
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-warning">
+                                <div class="card-body">
+                                    <h6 class="text-muted fw-bold mb-2">Usuarios Activos</h6>
+                                    <h3 class="fw-bold mb-0">5</h3>
+                                    <small class="text-muted fw-semibold d-flex align-items-center mt-2">
+                                        <span class="me-1">👥</span> Personal en turno
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-success">
+                                <div class="card-body">
+                                    <h6 class="text-muted fw-bold mb-2">Créditos WhatsApp</h6>
+                                    <h3 class="fw-bold mb-0">{{ planAdquirido?.whatsapp_creditos_iniciales || '0' }}</h3>
+                                    <small class="text-success fw-semibold d-flex align-items-center mt-2">
+                                        <span class="me-1">💬</span> Activo durante 7 días
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-info">
+                                <div class="card-body">
+                                    <h6 class="text-muted fw-bold mb-2">Plan Adquirido</h6>
+                                    <h3 class="fw-bold mb-0 text-dark">{{ planAdquirido?.nombre || 'Cargando...' }}</h3>
+                                    <small class="text-info fw-semibold d-flex align-items-center mt-2">
+                                        <span class="me-1">💳</span> Próx. cobro 24 Jun
+                                    </small>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <div v-if="!planAdquirido">
+                    <h5 class="fw-bold mb-4 text-dark">Tu Configuración de Plan</h5>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <div v-if="plan" class="card shadow-sm border-0 rounded-4 bg-transparent">
+                                <div class="row g-4">
+                                    <PlanCard
+                                        v-for="plan in planes"
+                                        :key="plan.id"
+                                        :plan="plan"
+                                    />
+                                </div>
+                            </div>
+
+                            <div v-else class="card shadow-sm border-0 rounded-4 bg-transparent">
+                                <div class="row g-4">
+                                    <PlanCard
+                                        v-for="plan in planes"
+                                        :key="plan.id"
+                                        :plan="plan"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
 
             </main>
         </div>

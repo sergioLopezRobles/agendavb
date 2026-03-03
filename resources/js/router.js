@@ -4,6 +4,7 @@ import Login from "./pages/Login.vue";
 import Register from "./pages/Register.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import Planes from "./componentes/Planes.vue";
+import PlanCard from "@/componentes/PlanCard.vue";
 
 const routes = [
     {
@@ -21,6 +22,11 @@ const routes = [
     {
         path: '/dashboard',
         component: Dashboard,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/registrar-plan-negocio',
+        component: PlanCard,
         meta: { requiresAuth: true }
     }
 

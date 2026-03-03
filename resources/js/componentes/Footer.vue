@@ -1,6 +1,6 @@
 <template>
 
-    <footer class="bg-white border-top pt-5 pb-3 mt-auto">
+    <footer class="bg-white border-top pt-3 pb-2 mt-auto">
 
         <div class="container">
 
@@ -34,7 +34,7 @@
                 </div>
             </section>
 
-            <hr class="text-muted opacity-25 my-4" />
+            <hr class="text-muted opacity-25 my-2" />
 
             <section class="mb-0">
                 <div class="row d-flex justify-content-center text-center">
@@ -49,7 +49,7 @@
                 </div>
             </section>
 
-            <section class="text-center mb-4">
+            <section class="text-center mb-0">
                 <a href="#" class="btn btn-outline-light btn-floating m-1 text-muted border-0 fs-5">
                     <i class="fab fa-facebook-f"></i>
                 </a>

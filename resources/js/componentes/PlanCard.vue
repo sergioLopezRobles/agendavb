@@ -13,17 +13,17 @@ const props = defineProps({
 const mostrarModal = ref(false)
 
 // Variables para el flujo de verificación
-const codigoEnviado = ref(false)
-const numeroVerificado = ref(false)
+const codigoEnviado = ref(true)
+const numeroVerificado = ref(true)
 
 // Estado del formulario
 const formulario = reactive({
     nombre: '',
-    telefono: '',
+   // telefono: '',
     email: '', // Se llenará con el correo del usuario logueado
     hora_inicio: '',
     hora_fin: '',
-    codigo_verificacion: ''
+   //codigo_verificacion: ''
 })
 
 const errores = reactive({})
@@ -138,15 +138,15 @@ const validarFormulario = () => {
         esValido = false
     }
 
-    if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
+   /* if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
         errores.telefono = 'Debe contener exactamente 10 dígitos numéricos.'
         esValido = false
-    }
+    }*/
 
-    if (!numeroVerificado.value) {
+    /*if (!numeroVerificado.value) {
         errores.telefono = 'Debes verificar el número de teléfono para continuar.'
         esValido = false
-    }
+    }*/
 
     if (!formulario.hora_inicio) {
         errores.hora_inicio = 'Selecciona la hora de apertura.'
@@ -164,10 +164,40 @@ const validarFormulario = () => {
     return esValido
 }
 
-const registrarNegocio = () => {
-    if (validarFormulario()) {
+const formRegistrarPlanNegocio = async () => {
+    if (!validarFormulario()) return
 
-        // cerrarModal()
+    try{
+        const response = await fetch('/api/registrar-plan-negocio',{
+            method: 'POST',
+            headers: {
+                'Content-Type' : 'application/json',
+                // Es vital enviar el token para que el middleware auth:sanctum te deje pasar
+                'Authorization': `Bearer ${token.value}`
+            },
+            body: JSON.stringify({
+                plan: props.plan.id,
+                nombre: formulario.nombre,
+                email: formulario.email,
+                // telefono: formulario.telefono,
+                hora_inicio: formulario.hora_inicio,
+                hora_fin: formulario.hora_fin
+            })
+        })
+
+        const data = await response.json()
+
+        if(data.valid){
+            //registro exitoso
+            window.$toast.show(data.message, 'success', 5000)
+            window.location.reload()
+        }else{
+            //registro no exitoso
+            window.$toast.show(data.message, 'warning', 5000)
+        }
+    }catch (error) {
+        console.error("Error en la petición:", error)
+        window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
     }
 }
 </script>
@@ -255,7 +285,7 @@ const registrarNegocio = () => {
                         </div>
                     </div>
 
-                    <form @submit.prevent="registrarNegocio">
+                    <form @submit.prevent="formRegistrarPlanNegocio">
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
@@ -362,12 +392,11 @@ const registrarNegocio = () => {
                     <button
                         type="button"
                         class="btn btn-primary fw-bold px-5 py-2 rounded-pill shadow-sm d-flex align-items-center"
-                        @click="registrarNegocio">
+                        @click="formRegistrarPlanNegocio">
                         <!--:disabled="!numeroVerificado"-->
                         <span class="me-2">💾</span> Finalizar Registro
                     </button>
                 </div>
-
             </div>
         </div>
     </div>
