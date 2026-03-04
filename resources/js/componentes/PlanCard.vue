@@ -19,7 +19,7 @@ const numeroVerificado = ref(true)
 // Estado del formulario
 const formulario = reactive({
     nombre: '',
-   // telefono: '',
+    telefono: '',
     email: '', // Se llenará con el correo del usuario logueado
     hora_inicio: '',
     hora_fin: '',
@@ -138,10 +138,10 @@ const validarFormulario = () => {
         esValido = false
     }
 
-   /* if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
+   if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
         errores.telefono = 'Debe contener exactamente 10 dígitos numéricos.'
         esValido = false
-    }*/
+    }
 
     /*if (!numeroVerificado.value) {
         errores.telefono = 'Debes verificar el número de teléfono para continuar.'
@@ -179,7 +179,7 @@ const formRegistrarPlanNegocio = async () => {
                 plan: props.plan.id,
                 nombre: formulario.nombre,
                 email: formulario.email,
-                // telefono: formulario.telefono,
+                telefono: formulario.telefono,
                 hora_inicio: formulario.hora_inicio,
                 hora_fin: formulario.hora_fin
             })
@@ -190,6 +190,7 @@ const formRegistrarPlanNegocio = async () => {
         if(data.valid){
             //registro exitoso
             window.$toast.show(data.message, 'success', 5000)
+            cerrarModal()
             window.location.reload()
         }else{
             //registro no exitoso
@@ -311,7 +312,7 @@ const formRegistrarPlanNegocio = async () => {
                             <small class="text-muted mt-1 d-block">Este correo está vinculado a tu cuenta de usuario.</small>
                         </div>
 
-                        <!--<div class="mb-3">
+                        <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">Teléfono de Notificaciones (WhatsApp)</label>
 
                             <div class="input-group input-group-lg shadow-sm">
@@ -322,10 +323,19 @@ const formRegistrarPlanNegocio = async () => {
                                     :class="{ 'is-invalid': errores.telefono }"
                                     placeholder="10 dígitos"
                                     maxlength="10"
-                                    :disabled="numeroVerificado"
                                     @input="formulario.telefono = formulario.telefono.replace(/\D/g, '')"
                                 >
-                                <button
+                                <!--  <input
+                                   type="tel"
+                                   v-model="formulario.telefono"
+                                   class="form-control bg-light border-0"
+                                   :class="{ 'is-invalid': errores.telefono }"
+                                   placeholder="10 dígitos"
+                                   maxlength="10"
+                                   :disabled="numeroVerificado"
+                                   @input="formulario.telefono = formulario.telefono.replace(/\D/g, '')"
+                               >
+                             <button
                                     class="btn fw-bold px-4"
                                     :class="numeroVerificado ? 'btn-success' : 'btn-outline-primary bg-white'"
                                     type="button"
@@ -333,33 +343,33 @@ const formRegistrarPlanNegocio = async () => {
                                     :disabled="formulario.telefono.length !== 10 || numeroVerificado"
                                 >
                                     {{ numeroVerificado ? '✅ Verificado' : 'Verificar' }}
-                                </button>
-                            </div>
-                            <div class="text-danger small mt-1 fw-medium" v-if="errores.telefono">{{ errores.telefono }}</div>
-                        </div>
+                                </button>-->
+                             </div>
+                             <div class="text-danger small mt-1 fw-medium" v-if="errores.telefono">{{ errores.telefono }}</div>
+                         </div>
 
-                        <div v-if="codigoEnviado" class="mb-4 p-3 bg-primary bg-opacity-10 rounded-3 border border-primary border-opacity-25">
-                            <label class="form-label fw-bold text-primary">Ingresa el código que enviamos por SMS</label>
-                            <div class="input-group input-group-lg shadow-sm">
-                                <input
-                                    type="text"
-                                    v-model="formulario.codigo_verificacion"
-                                    class="form-control bg-white border-0 text-center fw-bold text-primary"
-                                    placeholder="------"
-                                    maxlength="6"
-                                    @input="formulario.codigo_verificacion = formulario.codigo_verificacion.replace(/\D/g, '')"
-                                >
-                                <button
-                                    class="btn btn-primary fw-bold px-4"
-                                    type="button"
-                                    @click="confirmarCodigo"
-                                    :disabled="formulario.codigo_verificacion.length !== 6"
-                                >
-                                    Confirmar
-                                </button>
-                            </div>
-                            <small class="text-muted mt-2 d-block">Demo: Para probar, escribe 6 números cualesquiera.</small>
-                        </div>-->
+                        <!-- <div v-if="codigoEnviado" class="mb-4 p-3 bg-primary bg-opacity-10 rounded-3 border border-primary border-opacity-25">
+                             <label class="form-label fw-bold text-primary">Ingresa el código que enviamos por SMS</label>
+                             <div class="input-group input-group-lg shadow-sm">
+                                 <input
+                                     type="text"
+                                     v-model="formulario.codigo_verificacion"
+                                     class="form-control bg-white border-0 text-center fw-bold text-primary"
+                                     placeholder="------"
+                                     maxlength="6"
+                                     @input="formulario.codigo_verificacion = formulario.codigo_verificacion.replace(/\D/g, '')"
+                                 >
+                                 <button
+                                     class="btn btn-primary fw-bold px-4"
+                                     type="button"
+                                     @click="confirmarCodigo"
+                                     :disabled="formulario.codigo_verificacion.length !== 6"
+                                 >
+                                     Confirmar
+                                 </button>
+                             </div>
+                             <small class="text-muted mt-2 d-block">Demo: Para probar, escribe 6 números cualesquiera.</small>
+                         </div>-->
 
                         <div class="row g-3 mt-2">
                             <div class="col-md-6">

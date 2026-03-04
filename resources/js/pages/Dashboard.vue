@@ -11,6 +11,8 @@ const isSidebarExpanded = ref(true)
 const planAdquirido = ref(null)
 const usuarioLoggeado = ref(null)
 
+const mostrarTodosPlanes = ref(false)
+
 const toggleSidebar = () => {
     isSidebarExpanded.value = !isSidebarExpanded.value
 }
@@ -24,10 +26,12 @@ const cargarDashboard = async()  => {
     if(planGuardado){
         console.log(planGuardado)
         planes.value = [planGuardado]
+        mostrarTodosPlanes.value = false
     }else {
         const response = await fetch('/api/planes')
         planes.value = await response.json()
         console.log(planes)
+        mostrarTodosPlanes.value = true
     }
 
     try{
@@ -54,7 +58,6 @@ const cargarDashboard = async()  => {
     }
 }
 
-
 const logout = async () => {
     const token = localStorage.getItem('token')
 
@@ -78,6 +81,12 @@ const logout = async () => {
     // redirigir al inicio
     router.push('/')
 }
+
+const eventMostrarTodosPlanes = async () => {
+    const response = await fetch('/api/planes')
+    planes.value = await response.json()
+    mostrarTodosPlanes.value = true
+}
 </script>
 
 <template>
@@ -99,7 +108,7 @@ const logout = async () => {
                 </li>
 
                 <li v-if="planAdquirido" class="nav-item mt-2 pt-2 border-top">
-                    <small class="text-muted fw-bold ms-3 menu-text d-block mb-2">MÓDULOS</small>
+                    <small class="text-muted fw-bold ms-3 menu-text d-block mb-2">MODULOS</small>
                 </li>
 
                 <li v-if="planAdquirido" class="nav-item">
@@ -251,21 +260,22 @@ const logout = async () => {
                 </div>
 
                 <div v-if="!planAdquirido">
-                    <h5 class="fw-bold mb-4 text-dark">Tu Configuración de Plan</h5>
+                    <div class="row mb-5">
+                        <div class="col-12 d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold mb-0 text-dark">
+                                Tu Configuración de Plan
+                            </h5>
+
+                            <button
+                                v-if="!mostrarTodosPlanes" @click="eventMostrarTodosPlanes" class="btn btn-link fw-bold fs-6 p-0">
+                                Ver todos los planes
+                            </button>
+                        </div>
+                    </div>
 
                     <div class="row">
                         <div class="col-12">
-                            <div v-if="plan" class="card shadow-sm border-0 rounded-4 bg-transparent">
-                                <div class="row g-4">
-                                    <PlanCard
-                                        v-for="plan in planes"
-                                        :key="plan.id"
-                                        :plan="plan"
-                                    />
-                                </div>
-                            </div>
-
-                            <div v-else class="card shadow-sm border-0 rounded-4 bg-transparent">
+                            <div class="card shadow-sm border-0 rounded-4 bg-transparent">
                                 <div class="row g-4">
                                     <PlanCard
                                         v-for="plan in planes"

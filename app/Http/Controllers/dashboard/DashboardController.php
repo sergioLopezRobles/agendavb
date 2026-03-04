@@ -17,7 +17,7 @@ class DashboardController extends Controller
 
         Log::info('entro Dashboard ' . $idUsuario);
 
-        // 1. AÑADIMOS 'name' a la consulta para que Vue lo pueda mostrar
+        // 1. se anade 'name' a la consulta para que Vue lo pueda mostrar
         $usuarioLoggeado = DB::select("SELECT id_plan, email, name FROM users WHERE id = " . $idUsuario);
 
         if($usuarioLoggeado != null){
@@ -28,7 +28,7 @@ class DashboardController extends Controller
 
                 return response()->json([
                     'valid' => true,
-                    // 2. AÑADIMOS [0] para enviar el objeto limpio a Vue, no un arreglo
+                    // 2. se anade [0] para enviar el objeto limpio a Vue, no un arreglo
                     'planAdquirido' => $planAdquirido[0],
                     'usuarioLoggeado' => $usuarioLoggeado[0],
                 ]);
