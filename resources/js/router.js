@@ -4,7 +4,8 @@ import Login from "./pages/Login.vue";
 import Register from "./pages/Register.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import Planes from "./componentes/Planes.vue";
-import PlanCard from "@/componentes/PlanCard.vue";
+import PlanCard from "./componentes/PlanCard.vue";
+import Negocios from "./pages/Negocios.vue"; // <- Aquí importamos tu nueva vista
 
 const routes = [
     {
@@ -25,11 +26,15 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
+        path: '/negocios', // <- La nueva ruta para acceder a la vista
+        component: Negocios,
+        meta: { requiresAuth: true }
+    },
+    {
         path: '/registrar-plan-negocio',
         component: PlanCard,
         meta: { requiresAuth: true }
     }
-
 ]
 
 const router = createRouter({
@@ -38,30 +43,21 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-
     const token = localStorage.getItem('token')
-
     const publicpages = ['/', '/login', '/register']
     const authrequired = to.meta.requiresAuth
     const ispublic = publicpages.includes(to.path)
 
-    // ❌ NO autenticado → intenta entrar a dashboard
-    if (authrequired && !token)
-    {
-        return next('/') // ← CAMBIO AQUI (antes era /login)
+    // NO autenticado → intenta entrar a área protegida
+    if (authrequired && !token) {
+        return next('/')
     }
-
-
-    // ✅ Autenticado → intenta ir a login, register o home
-    if (token && ispublic)
-    {
+    // Autenticado → intenta ir a login, register o home
+    if (token && ispublic) {
         return next('/dashboard')
     }
-
-
     next()
+    return true
 })
-
-
 
 export default router

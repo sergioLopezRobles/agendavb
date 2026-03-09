@@ -38,4 +38,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //ruta dashboard
     Route::get('/dashboard',[DashboardController::class,'index']);
     Route::post('/registrar-plan-negocio', [DashboardController::class, 'registrarPlanNegocio']);
+
+    // Rutas del Módulo de Negocios
+    Route::get('/mis-negocios', [DashboardController::class, 'misNegocios']);
+    Route::put('/negocios/{id}', [DashboardController::class, 'actualizarNegocio']);
 });

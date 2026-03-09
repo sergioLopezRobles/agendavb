@@ -23,10 +23,6 @@ onMounted(async () => {
 
             <div class="text-center mb-5">
 
-                <div class="bg-white shadow-sm rounded-circle d-inline-flex justify-content-center align-items-center mb-4" style="width: 80px; height: 80px;">
-                    <span class="fs-1">💎</span>
-                </div>
-
                 <h1 class="text-primary fw-bold display-5 mb-3">
                     Planes disponibles
                 </h1>
