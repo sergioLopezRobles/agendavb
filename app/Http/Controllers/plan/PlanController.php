@@ -8,11 +8,29 @@ use Illuminate\Support\Facades\DB;
 class PlanController extends Controller
 {
     public function verplanes(){
-      $planes = DB::table('planes')->get();
-      /*$planes = DB::select('SELECT * FROM planes ORDER BY created_at DESC');
-      $planes = null;*/
 
+        $rows = DB::select('
+        SELECT cp.id_plan, cp.titulo, cp.valor, p.nombre
+        FROM planes p
+        INNER JOIN caracteristicasplanes cp ON cp.id_plan = p.id
+        ORDER BY p.created_at DESC
+    ');
 
-      return response()->json($planes);
+        $planes = [];
+
+        foreach ($rows as $row) {
+
+            if(!isset($planes[$row->id_plan])){
+                $planes[$row->id_plan] = [
+                    'id' => $row->id_plan,
+                    'nombre' => $row->nombre,
+                    'caracteristicas' => []
+                ];
+            }
+
+            $planes[$row->id_plan]['caracteristicas'][$row->titulo] = $row->valor;
+        }
+
+        return response()->json(array_values($planes));
     }
 }

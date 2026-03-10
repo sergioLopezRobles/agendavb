@@ -10,7 +10,8 @@ const planGuardado = JSON.parse(localStorage.getItem('planSeleccionado'))
 const token = ref(localStorage.getItem('token'))
 
 const props = defineProps({
-    plan: Object
+    plan: Object,
+    currentPlanId: [Number, String, null]
 })
 
 const mostrarModal = ref(false)
@@ -183,35 +184,44 @@ const formRegistrarPlanNegocio = async () => {
                 </h4>
 
                 <h2 class="text-primary fw-bold mb-2 display-6">
-                    ${{ plan.precio }}
+                    ${{ plan.caracteristicas.precio }}
                     <span class="text-muted fs-6 fw-normal">/mes</span>
                 </h2>
 
-                <p class="text-secondary mb-4">{{ plan.descripcion }}</p>
+                <p class="text-secondary mb-4">{{ plan.caracteristicas.descripcion }}</p>
 
                 <hr class="text-muted opacity-25 mb-4">
 
                 <ul class="list-unstyled text-start mb-4 flex-grow-1">
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">📅</span>
-                        <span class="text-secondary fw-medium">Intervalo: {{ plan.intervalo_citas_minutos }} min</span>
+                        <span class="text-secondary fw-medium">Intervalo: {{ plan.caracteristicas.intervalo_citas_minutos }} min</span>
                     </li>
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">⏰</span>
-                        <span class="text-secondary fw-medium">Recordatorio: {{ plan.recordatorio_minutos }} min antes</span>
+                        <span class="text-secondary fw-medium">Recordatorio: {{ plan.caracteristicas.recordatorio_minutos }} min antes</span>
                     </li>
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">💬</span>
-                        <span class="text-secondary fw-medium">WhatsApp: {{ plan.whatsapp_creditos_iniciales }} créditos</span>
+                        <span class="text-secondary fw-medium">WhatsApp: {{ plan.caracteristicas.whatsapp_creditos_iniciales }} créditos</span>
                     </li>
                 </ul>
 
             </div>
 
             <div class="card-footer bg-transparent border-0 p-4 pt-0">
-                <button v-if="token && planGuardado" @click="abrirModal" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3">
+                <button v-if="currentPlanId == plan.id" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3" disabled>
+                    Este es tu plan actual
+                </button>
+
+                <button v-else-if="currentPlanId != null" @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3">
+                    Seleccionar plan
+                </button>
+
+                <button v-else-if="token && planGuardado" @click="abrirModal" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3">
                     Registrar Negocio
                 </button>
+
                 <button v-else @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3">
                     Seleccionar plan
                 </button>
@@ -238,7 +248,7 @@ const formRegistrarPlanNegocio = async () => {
                                 <h5 class="fw-bold text-primary mb-0">{{ plan.nombre }}</h5>
                             </div>
                             <div class="text-end">
-                                <h4 class="fw-bold mb-0 text-dark">${{ plan.precio }} <small class="text-muted fs-6 fw-normal">/mes</small></h4>
+                                <h4 class="fw-bold mb-0 text-dark">${{ plan.caracteristicas.precio }} <small class="text-muted fs-6 fw-normal">/mes</small></h4>
                             </div>
                         </div>
 
@@ -301,39 +311,23 @@ const formRegistrarPlanNegocio = async () => {
                                 </div>
                             </div>
 
-                            <!-- <div class="col-md-12 mt-4 mb-3">
-                                 <label class="form-label fw-semibold text-secondary">
-                                     <span class="fs-5 me-2">💳</span>Datos de la Tarjeta
-                                 </label>
+                            <div v-if="plan.id == 3" class="col-md-12 mt-3">
+                                <label class="form-label fw-semibold text-secondary">URL DEL NEGOCIO</label>
+                                <div class="input-group has-validation">
+                                    <span class="input-group-text">www.agendavb/</span>
+                                    <input type="text" v-model="formulario.slug" class="form-control form-control-lg" placeholder="barberia-lopez" required>
+                                </div>
+                            </div>
 
-                                 <div id="card-element" class="form-control form-control-lg bg-light border-0 shadow-sm p-3"></div>
+                            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
+                                <button type="button" class="btn btn-light me-2 fw-bold" @click="cerrarModal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary fw-bold px-4">Guardar Negocio</button>
+                            </div>
 
-                                 <div class="text-danger small mt-2 fw-medium" v-if="errorTarjeta">
-                                     {{ errorTarjeta }}
-                                 </div>
-                             </div>-->
-
-                             <div v-if="plan.id == 3" class="col-md-12 mt-3">
-                                 <label for="validationCustomUsername" class="form-label fw-semibold text-secondary">URL DEL NEGOCIO</label>
-                                 <div class="input-group has-validation">
-                                     <span class="input-group-text" id="inputGroupPrepend">www.agendavb/</span>
-                                     <input type="text" v-model="formulario.slug" class="form-control form-control-lg" placeholder="barberia-lopez" required>
-                                 </div>
-                             </div>
-
-                         </form>
-                     </div>
-
-                     <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-center">
-                         <button
-                             type="button"
-                             class="btn btn-primary fw-bold px-5 py-2 rounded-pill shadow-sm d-flex align-items-center"
-                             @click="formRegistrarPlanNegocio">
-                             <span class="me-2">💾</span> Finalizar Registro
-                         </button>
-                     </div>
-                 </div>
-             </div>
-         </div>
-     </div>
- </template>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>

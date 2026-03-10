@@ -1,6 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import Layout from '../componentes/Layout.vue';
+import PlanCard from '../componentes/PlanCard.vue';
+
+const mostrarModalUpgrade = ref(false);
+const planesDisponibles = ref([]);
 
 const token = localStorage.getItem('token');
 const negocios = ref([]);
@@ -8,19 +12,39 @@ const limiteNegocios = ref(1); // Por defecto 1
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
 
-// Variables para el Modal de Edición
+//Variables para el Modal de Edición
 const mostrarModalEdicion = ref(false);
-// 👇 Agregamos 'slug' a la edición
+//Agregamos 'slug' a la edición
 const negocioEditando = ref({ id: '', nombre: '', telefono: '', email: '', slug: ''});
 
-// Variables para el Modal de Creación
+//Variables para el Modal de Creación
 const mostrarModalCreacion = ref(false);
-// 👇 Agregamos 'slug' a la creación
+//Agregamos 'slug' a la creación
 const nuevoNegocio = ref({ nombre: '', email: '', telefono: '', hora_inicio: '', hora_fin: '', slug: '' });
 
 onMounted(() => {
     cargarNegocios();
+    cargarPlanes();
 });
+
+// 👇 NUEVA FUNCIÓN: Trae los 3 planes de la BD
+const cargarPlanes = async () => {
+    try {
+        const response = await fetch('/api/planes');
+        planesDisponibles.value = await response.json();
+    } catch (error) {
+        console.error("Error al cargar los planes", error);
+    }
+};
+
+//NUEVA FUNCIÓN: abre el Paywall
+const intentarAccesoPremium = (nivelRequerido) => {
+    if (planAdquirido.value.id < nivelRequerido) {
+        mostrarModalUpgrade.value = true; // Abrimos la pantalla de los 3 planes
+        return false; // Bloqueamos la acción original
+    }
+    return true; // Si tiene el plan, lo dejamos pasar
+};
 
 const cargarNegocios = async () => {
     try {
@@ -53,7 +77,7 @@ const abrirModalEdicion = (negocio) => {
         nombre: negocio.nombre,
         telefono: negocio.telefono,
         email: negocio.email,
-        slug: negocio.slug // 👇 Pasamos el slug actual para que se vea
+        slug: negocio.slug //Pasamos el slug actual para que se vea
     };
     mostrarModalEdicion.value = true;
 };
@@ -89,18 +113,21 @@ const clickAgregarNegocio = () => {
     const creados = Number(negocios.value.length);
     const permitidos = Number(limiteNegocios.value);
 
+    // Si ya alcanzó su límite (ej. 1 en el básico)
     if (creados >= permitidos) {
-        window.$toast.show(`Tu plan solo te permite tener ${permitidos} negocio(s).`, 'warning', 5000);
+        // En lugar de bloquear, le abrimos la pantalla de Upgrade de planes
+        mostrarModalUpgrade.value = true;
         return;
     }
 
+    // Si todavía tiene espacio (ej. lleva 1 y su plan permite 3)
     nuevoNegocio.value = {
         nombre: '',
         email: usuarioLoggeado.value?.email || '',
         telefono: '',
         hora_inicio: '',
         hora_fin: '',
-        slug: '' // Limpiamos el slug al abrir
+        slug: ''
     };
     mostrarModalCreacion.value = true;
 };
@@ -158,13 +185,10 @@ const guardarNuevoNegocio = async () => {
 
             <button
                 @click="clickAgregarNegocio"
-                class="btn rounded-pill px-4 shadow-sm fw-semibold d-flex align-items-center"
-                :class="negocios.length >= limiteNegocios ? 'btn-secondary' : 'btn-primary'"
-                :disabled="negocios.length >= limiteNegocios"
+                class="btn btn-primary rounded-pill px-4 shadow-sm fw-semibold d-flex align-items-center"
             >
-                <span class="fs-5 me-2" v-if="negocios.length < limiteNegocios">+</span>
-                <span class="fs-5 me-2" v-else>🔒</span>
-                {{ negocios.length >= limiteNegocios ? 'Límite Alcanzado' : 'Añadir Negocio' }}
+                <span class="fs-5 me-2">+</span>
+                Añadir Negocio
             </button>
         </div>
 
@@ -178,7 +202,7 @@ const guardarNuevoNegocio = async () => {
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Correo</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Teléfono</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Horario</th>
-                        <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
+                        <th class="py-3 px-5 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -199,6 +223,9 @@ const guardarNuevoNegocio = async () => {
                         <td class="px-4 py-3 text-end">
                             <button @click="abrirModalEdicion(negocio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-2" title="Editar Información">
                                 ✏️
+                            </button>
+                            <button @click="intentarAccesoPremium(2) ? abrirServicios(negocio) : null" class="btn btn-sm btn-outline-success rounded-circle p-2 me-2" title="Agregar Servicios">
+                                📋
                             </button>
                         </td>
                     </tr>
@@ -288,20 +315,63 @@ const guardarNuevoNegocio = async () => {
                             </div>
                         </div>
 
-                        <div v-if="planAdquirido?.id == 3" class="col-md-12 mt-4">
-                            <label class="form-label fw-semibold text-secondary">URL DEL NEGOCIO</label>
-                            <div class="input-group has-validation shadow-sm">
-                                <span class="input-group-text bg-white border-end-0">www.agendavb/</span>
-                                <input type="text" v-model="nuevoNegocio.slug" class="form-control form-control-lg bg-light border-start-0" placeholder="mi-nueva-sucursal">
+                        <div class="col-md-12 mt-4">
+                            <label class="form-label fw-semibold text-secondary d-flex align-items-center">
+                                URL DEL NEGOCIO
+                                <span v-if="planAdquirido?.id < 3" class="badge bg-warning text-dark ms-2 shadow-sm">
+                                    ⭐ Plan Avanzado
+                                </span>
+                            </label>
+                            <div class="input-group has-validation shadow-sm" @click="planAdquirido?.id < 3 ? intentarAccesoPremium(3) : null">
+                            <span class="input-group-text bg-white border-end-0" :class="{'text-muted': planAdquirido?.id < 3}">
+                                www.agendavb/
+                            </span>
+                                <input
+                                    type="text"
+                                    v-model="nuevoNegocio.slug"
+                                    class="form-control form-control-lg border-start-0"
+                                    placeholder="mi-nueva-sucursal"
+                                    :readonly="planAdquirido?.id < 3"
+                                    :class="{'bg-light text-muted': planAdquirido?.id < 3}"
+                                >
                             </div>
                         </div>
-
                     </div>
 
                     <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-center">
                         <button type="button" class="btn btn-primary fw-bold px-5 py-2 rounded-pill shadow-sm" @click="guardarNuevoNegocio">
                             💾 Guardar Negocio!
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalUpgrade" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); backdrop-filter: blur(5px);">
+            <div class="modal-dialog modal-dialog-centered modal-xl">
+                <div class="modal-content border-0 shadow-lg rounded-4 bg-light">
+
+                    <div class="modal-header border-bottom-0 pb-0 px-5 pt-5 text-center d-block position-relative">
+                        <button type="button" class="btn-close position-absolute top-0 end-0 m-4 shadow-none" @click="mostrarModalUpgrade = false"></button>
+                        <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex justify-content-center align-items-center mb-3" style="width: 80px; height: 80px;">
+                            <span class="fs-1">🚀</span>
+                        </div>
+                        <h2 class="fw-bold text-dark mb-2">Lleva tu negocio al siguiente nivel</h2>
+                        <p class="text-muted fs-5 mb-0">
+                            Tu plan actual es <span class="fw-bold text-primary">{{ planAdquirido?.nombre }}</span>.
+                            Mejora tu suscripción para desbloquear esta y más herramientas.
+                        </p>
+                    </div>
+
+                    <div class="modal-body px-5 py-5">
+                        <div class="row g-4 justify-content-center">
+                            <PlanCard
+                                v-for="plan in planesDisponibles"
+                                :key="plan.id"
+                                :plan="plan"
+                                :current-plan-id="planAdquirido ? planAdquirido.id : null"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

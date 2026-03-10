@@ -34,13 +34,11 @@ onMounted(async () => {
             </div>
 
             <div class="row g-4 justify-content-center">
-
                 <PlanCard
                     v-for="plan in planes"
                     :key="plan.id"
                     :plan="plan"
                 />
-
             </div>
 
         </div>
