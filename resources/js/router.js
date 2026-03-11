@@ -5,7 +5,8 @@ import Register from "./pages/Register.vue";
 import Dashboard from "./pages/Dashboard.vue";
 import Planes from "./componentes/Planes.vue";
 import PlanCard from "./componentes/PlanCard.vue";
-import Negocios from "./pages/Negocios.vue"; // <- Aquí importamos tu nueva vista
+import Negocios from "./pages/Negocios.vue";
+import TicketsSoporte from "./pages/TicketsSoporte.vue"
 
 const routes = [
     {
@@ -26,7 +27,7 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
-        path: '/negocios', // <- La nueva ruta para acceder a la vista
+        path: '/negocios',
         component: Negocios,
         meta: { requiresAuth: true }
     },
@@ -34,7 +35,12 @@ const routes = [
         path: '/registrar-plan-negocio',
         component: PlanCard,
         meta: { requiresAuth: true }
-    }
+    },
+    {
+        path: '/soporte',
+        name: 'Soporte',
+        component: TicketsSoporte,
+    },
 ]
 
 const router = createRouter({

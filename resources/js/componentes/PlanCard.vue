@@ -38,6 +38,54 @@ let stripe = null;
 let cardElement = null;
 const errorTarjeta = ref(''); // Para mostrar si meten una tarjeta inválida
 
+const horariosDisponibles = [
+    "00:00 - 01:00",
+    "01:00 - 02:00",
+    "02:00 - 03:00",
+    "03:00 - 04:00",
+    "04:00 - 05:00",
+    "05:00 - 06:00",
+    "06:00 - 07:00",
+    "07:00 - 08:00",
+    "08:00 - 09:00",
+    "09:00 - 10:00",
+    "10:00 - 11:00",
+    "11:00 - 12:00",
+    "12:00 - 13:00",
+    "13:00 - 14:00",
+    "14:00 - 15:00",
+    "15:00 - 16:00",
+    "16:00 - 17:00",
+    "17:00 - 18:00",
+    "18:00 - 19:00",
+    "19:00 - 20:00",
+    "20:00 - 21:00",
+    "21:00 - 22:00",
+    "22:00 - 23:00",
+    "23:00 - 24:00"
+]
+
+const horarioSeleccionado = ref("")
+const horarios = ref([])
+
+function agregarHorario() {
+
+    if(!horarioSeleccionado.value) return
+
+    if(horarios.value.includes(horarioSeleccionado.value)){
+        alert("Ese horario ya fue agregado")
+        return
+    }
+
+    horarios.value.push(horarioSeleccionado.value)
+
+    horarioSeleccionado.value = ""
+}
+
+function eliminarHorario(index){
+    horarios.value.splice(index,1)
+}
+
 onMounted(() => {
     const userEmail = localStorage.getItem('userEmail')
     formulario.email = userEmail ? userEmail : ''
@@ -146,7 +194,8 @@ const formRegistrarPlanNegocio = async () => {
                 telefono: formulario.telefono,
                 hora_inicio: formulario.hora_inicio,
                 hora_fin: formulario.hora_fin,
-                slug: formulario.slug
+                slug: formulario.slug,
+                horarios: horarios.value,
             })
         })
 
@@ -156,7 +205,6 @@ const formRegistrarPlanNegocio = async () => {
             window.$toast.show(data.message, 'success', 5000)
             cerrarModal()
 
-            // ESTA ES LA LÍNEA QUE TE SALVARÁ LA VIDA:
             window.location.reload()
         }else{
             window.$toast.show(data.message, 'warning', 5000)
@@ -309,6 +357,34 @@ const formRegistrarPlanNegocio = async () => {
                                     >
                                     <div class="invalid-feedback fw-medium">{{ errores.hora_fin }}</div>
                                 </div>
+                            </div>
+
+                            <select v-model="horarioSeleccionado">
+                                <option value="">Selecciona horario</option>
+
+                                <option
+                                    v-for="hora in horariosDisponibles"
+                                    :key="hora"
+                                    :value="hora"
+                                >
+                                    {{hora}}
+                                </option>
+
+                            </select>
+
+                            <button type="button" @click="agregarHorario">
+                                Agregar
+                            </button>
+
+
+                            <div v-for="(hora,index) in horarios" :key="index">
+
+                                {{hora}}
+
+                                <button type="button" @click="eliminarHorario(index)">
+                                    X
+                                </button>
+
                             </div>
 
                             <div v-if="plan.id == 3" class="col-md-12 mt-3">

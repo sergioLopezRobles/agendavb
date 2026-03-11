@@ -75,6 +75,10 @@ const logout = async () => {
                         <span class="menu-text fw-medium">Usuarios y Roles</span>
                     </a>
                 </li>
+                <router-link to="/soporte" class="nav-link text-dark d-flex align-items-center mb-2 py-2 px-3 rounded-3" active-class="bg-primary bg-opacity-10 text-primary fw-bold">
+                    <span class="fs-3 me-2">🎧</span>
+                    <span class="menu-text fw-medium">Centro de Soporte</span>
+                </router-link>
             </ul>
         </div>
 

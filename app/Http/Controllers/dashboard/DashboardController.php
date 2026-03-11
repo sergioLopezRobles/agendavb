@@ -62,7 +62,7 @@ class DashboardController extends Controller
                 $globalFuncion = new GlobalFuncion();
                 $caracteristicasPlan = $globalFuncion->obtenerPlanCompleto($planNegocio->id);
 
-                $maxPermitido = $caracteristicasPlan['maximonegocios'] ?? 1;
+                $maxPermitido = $caracteristicasPlan->maximonegocios ?? 1;
 
                 $cantidadActual = DB::table('negocios')->where('id_usuario', Auth::id())->count();
 
@@ -92,19 +92,31 @@ class DashboardController extends Controller
                 }
 
                 // 3. Inserción normal
-                DB::table('negocios')->insert([
+                $idNegocio = DB::table('negocios')->insertGetId([
                     'id_usuario' => $request->user()->id,
                     'id_plan' => $request->plan,
                     'nombre' => $request->nombre,
                     'slug' => $slug, // Se guarda nuestro nuevo slug validado
                     'email' => $request->email,
                     'telefono' => $request->telefono ?? '0000000000',
-                    'whatsapp_creditos' => $caracteristicasPlan['whatsapp_creditos_iniciales'] ?? 0,
+                    'whatsapp_creditos' => $caracteristicasPlan->whatsapp_creditos_iniciales?? 0,
                     'hora_inicio' => $request->hora_inicio,
                     'hora_fin' => $request->hora_fin,
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now()
                 ]);
+
+                foreach($request->horarios as $horario){
+
+                    $horas = explode(' - ', $horario);
+
+                    DB::table('horarios_negocios')->insert([
+                        'id_negocio' => $idNegocio,
+                        'hora_inicio' => $horas[0],
+                        'hora_fin' => $horas[1],
+                    ]);
+
+                }
 
                 DB::table('users')->where('id', Auth::id())->update([
                     'id_plan' => $request->plan
