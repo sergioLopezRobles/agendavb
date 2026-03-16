@@ -1,55 +1,39 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import Layout from '../componentes/Layout.vue';
 
-// 1. Variables para el menú lateral
+// VARIABLES GLOBALES
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
 
-// 2. Datos de prueba (Dummy Data) para la tabla
-const tickets = ref([
-    {
-        id: 'TKT-1042',
-        asunto: 'Error al sincronizar mi calendario con el plan avanzado',
-        negocio: 'Clínica Dental Vista Boreal',
-        prioridad: 'Alta',
-        estado: 'Abierto',
-        fecha: 'Hace 2 horas'
-    },
-    {
-        id: 'TKT-1041',
-        asunto: 'Duda sobre el límite de WhatsApp en el plan Medio',
-        negocio: 'Barbería López',
-        prioridad: 'Media',
-        estado: 'En Progreso',
-        fecha: 'Hace 5 horas'
-    },
-    {
-        id: 'TKT-1040',
-        asunto: 'No puedo agregar un tercer negocio al sistema',
-        negocio: 'Spa Relax',
-        prioridad: 'Baja',
-        estado: 'Resuelto',
-        fecha: 'Ayer'
-    },
-    {
-        id: 'TKT-1039',
-        asunto: 'Solicitud de cambio de correo del titular',
-        negocio: 'Consultorio Dr. Martínez',
-        prioridad: 'Alta',
-        estado: 'Abierto',
-        fecha: 'Hace 1 día'
-    }
-]);
+// DATOS TRAIDOS DE LA BASE DE DATOS
+const tickets = ref([]);
+const prioridadesTicket = ref([]);
+const estadosTicket = ref([]);
+const misNegocios = ref([]);
 
+// VARIABLES DE FILTROS
 const buscar = ref('');
+const filtroEstado = ref('');
+const filtroPrioridad = ref('');
 
-// 3. Al montar la vista, traemos los datos del usuario para "despertar" el menú
-onMounted(() => {
-    cargarDatosMenu();
+// VARIABLES DEL MODAL Y FORMULARIO
+const mostrarModalTicket = ref(false);
+const errores = reactive({});
+
+const formularioTicket = reactive({
+    id_negocio: '',
+    asunto: ''
 });
 
+// AL INICIAR LA PANTALLA
+onMounted(() => {
+    cargarDatosMenu();
+    cargarDatosTickets();
+});
+
+// MANTIENE EL LAYOUT FUNCIONANDO
 const cargarDatosMenu = async () => {
     try {
         const response = await fetch('/api/dashboard', {
@@ -60,18 +44,110 @@ const cargarDatosMenu = async () => {
             }
         });
         const data = await response.json();
-
         if(data.valid) {
             usuarioLoggeado.value = data.usuarioLoggeado;
             planAdquirido.value = data.planAdquirido;
         }
     } catch (error) {
-        console.error("Error al cargar los datos para el menú", error);
+        console.error("ERROR AL CARGAR DATOS DEL MENU", error);
+    }
+};
+
+// TRAE LOS TICKETS, NEGOCIOS Y CATALOGOS DESDE LARAVEL
+const cargarDatosTickets = async () => {
+    try {
+        const response = await fetch('/api/tickets', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        const data = await response.json();
+
+        if(data.valid) {
+            tickets.value = data.tickets;
+            prioridadesTicket.value = data.prioridades;
+            estadosTicket.value = data.estados;
+            misNegocios.value = data.negocios;
+        }
+    } catch (error) {
+        window.$toast.show('Error al cargar la información de tickets', 'danger', 4000);
+    }
+};
+
+// COMPUTED PARA FILTRAR EN TIEMPO REAL
+const ticketsFiltrados = computed(() => {
+    return tickets.value.filter(ticket => {
+        // filtro de texto
+        const coincideTexto = ticket.id.toLowerCase().includes(buscar.value.toLowerCase()) ||
+            ticket.asunto.toLowerCase().includes(buscar.value.toLowerCase()) ||
+            ticket.negocio_nombre.toLowerCase().includes(buscar.value.toLowerCase());
+
+        // filtro de estado
+        const coincideEstado = filtroEstado.value === '' || (ticket.id_estado && ticket.id_estado.toString() === filtroEstado.value);
+
+        // --> la correccion esta aqui: validamos que exista la prioridad antes de intentar filtrarla
+        const coincidePrioridad = filtroPrioridad.value === '' || (ticket.id_prioridad && ticket.id_prioridad.toString() === filtroPrioridad.value);
+
+        return coincideTexto && coincideEstado && coincidePrioridad;
+    });
+});
+
+// METODOS DEL MODAL
+const abrirModalTicket = () => {
+    Object.keys(errores).forEach(key => delete errores[key]);
+    formularioTicket.id_negocio = '';
+    formularioTicket.asunto = '';
+    mostrarModalTicket.value = true;
+};
+
+const cerrarModalTicket = () => {
+    mostrarModalTicket.value = false;
+};
+
+// GUARDAR EL NUEVO TICKET
+const guardarTicket = async () => {
+    Object.keys(errores).forEach(key => delete errores[key]);
+    let esValido = true;
+
+    if (!formularioTicket.id_negocio) {
+        errores.id_negocio = 'Debes seleccionar un negocio.';
+        esValido = false;
+    }
+    if (!formularioTicket.asunto.trim()) {
+        errores.asunto = 'El asunto es obligatorio.';
+        esValido = false;
+    }
+
+    if (!esValido) return;
+
+    try {
+        const response = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formularioTicket)
+        });
+
+        const data = await response.json();
+
+        if(data.valid) {
+            window.$toast.show(data.message, 'success', 4000);
+            cerrarModalTicket();
+            cargarDatosTickets(); // RECARGAMOS LA TABLA
+        } else {
+            window.$toast.show(data.message, 'warning', 4000);
+        }
+    } catch (error) {
+        window.$toast.show('Error al crear el ticket', 'danger', 4000);
     }
 };
 
 const verTicket = (id) => {
-    console.log("Abriendo detalles del ticket:", id);
+    console.log("ABRIENDO DETALLES DEL TICKET:", id);
 };
 </script>
 
@@ -83,7 +159,7 @@ const verTicket = (id) => {
                 <h4 class="fw-bold mb-0 text-dark">Centro de Soporte</h4>
                 <p class="text-muted small mb-0">Gestión y resolución de tickets de clientes</p>
             </div>
-            <button class="btn btn-primary rounded-pill px-4 shadow-sm fw-semibold d-flex align-items-center">
+            <button @click="abrirModalTicket" class="btn btn-primary rounded-pill px-4 shadow-sm fw-semibold d-flex align-items-center">
                 <span class="fs-5 me-2">+</span> Nuevo Ticket
             </button>
         </div>
@@ -93,7 +169,7 @@ const verTicket = (id) => {
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-primary h-100">
                     <div class="card-body">
                         <h6 class="text-muted fw-bold mb-1">Total Tickets</h6>
-                        <h3 class="fw-bold mb-0 text-dark">124</h3>
+                        <h3 class="fw-bold mb-0 text-dark">{{ tickets.length }}</h3>
                     </div>
                 </div>
             </div>
@@ -101,7 +177,7 @@ const verTicket = (id) => {
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-danger h-100">
                     <div class="card-body">
                         <h6 class="text-muted fw-bold mb-1">Abiertos</h6>
-                        <h3 class="fw-bold mb-0 text-danger">12</h3>
+                        <h3 class="fw-bold mb-0 text-danger">{{ tickets.filter(t => t.id_estado == '1').length }}</h3>
                     </div>
                 </div>
             </div>
@@ -109,15 +185,15 @@ const verTicket = (id) => {
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-warning h-100">
                     <div class="card-body">
                         <h6 class="text-muted fw-bold mb-1">En Progreso</h6>
-                        <h3 class="fw-bold mb-0 text-warning">5</h3>
+                        <h3 class="fw-bold mb-0 text-warning">{{ tickets.filter(t => t.id_estado == '2').length }}</h3>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-success h-100">
                     <div class="card-body">
-                        <h6 class="text-muted fw-bold mb-1">Resueltos (Hoy)</h6>
-                        <h3 class="fw-bold mb-0 text-success">8</h3>
+                        <h6 class="text-muted fw-bold mb-1">Resueltos</h6>
+                        <h3 class="fw-bold mb-0 text-success">{{ tickets.filter(t => t.id_estado == '3').length }}</h3>
                     </div>
                 </div>
             </div>
@@ -134,17 +210,17 @@ const verTicket = (id) => {
                         </div>
                     </div>
                     <div class="col-md-8 text-end">
-                        <select class="form-select w-auto d-inline-block shadow-sm border-0 bg-light me-2">
-                            <option value="">Cualquier Estado</option>
-                            <option value="Abierto">Abiertos</option>
-                            <option value="En Progreso">En Progreso</option>
-                            <option value="Resuelto">Resueltos</option>
-                        </select>
-                        <select class="form-select w-auto d-inline-block shadow-sm border-0 bg-light">
+                        <select v-model="filtroPrioridad" class="form-select w-auto d-inline-block shadow-sm border-2 bg-light me-3">
                             <option value="">Cualquier Prioridad</option>
-                            <option value="Alta">Alta</option>
-                            <option value="Media">Media</option>
-                            <option value="Baja">Baja</option>
+                            <option v-for="prioridad in prioridadesTicket" :key="prioridad.id" :value="prioridad.id.toString()">
+                                {{ prioridad.descripcion }}
+                            </option>
+                        </select>
+                        <select v-model="filtroEstado" class="form-select w-auto d-inline-block shadow-sm border-2 bg-light">
+                            <option value="">Cualquier Estado</option>
+                            <option v-for="estado in estadosTicket" :key="estado.id" :value="estado.id.toString()">
+                                {{ estado.descripcion }}
+                            </option>
                         </select>
                     </div>
                 </div>
@@ -159,35 +235,36 @@ const verTicket = (id) => {
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Asunto / Negocio</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Prioridad</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Estado</th>
-                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Actualización</th>
+                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Fecha</th>
                             <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0">Acción</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr v-for="ticket in tickets" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket.id)">
+                        <tr v-for="ticket in ticketsFiltrados" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket.id)">
                             <td class="px-4 py-3 fw-bold text-primary">{{ ticket.id }}</td>
                             <td class="px-4 py-3">
                                 <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">{{ ticket.asunto }}</div>
-                                <div class="text-muted small">🏢 {{ ticket.negocio }}</div>
+                                <div class="text-muted small">🏢 {{ ticket.negocio_nombre }}</div>
                             </td>
                             <td class="px-4 py-3 text-center">
                                     <span class="badge rounded-pill"
                                           :class="{
-                                            'bg-danger bg-opacity-10 text-danger': ticket.prioridad === 'Alta',
-                                            'bg-warning bg-opacity-10 text-dark': ticket.prioridad === 'Media',
-                                            'bg-secondary bg-opacity-10 text-secondary': ticket.prioridad === 'Baja'
+                                            'bg-danger bg-opacity-10 text-danger': ticket.prioridad_nombre === 'Alta',
+                                            'bg-warning bg-opacity-10 text-dark': ticket.prioridad_nombre === 'Media',
+                                            'bg-secondary bg-opacity-10 text-secondary': ticket.prioridad_nombre === 'Baja',
+                                            'bg-light text-dark border': !ticket.prioridad_nombre
                                         }">
-                                        {{ ticket.prioridad }}
+                                        {{ ticket.prioridad_nombre || 'Por definir' }}
                                     </span>
                             </td>
                             <td class="px-4 py-3 text-center">
                                     <span class="badge rounded-pill"
                                           :class="{
-                                            'bg-primary': ticket.estado === 'Abierto',
-                                            'bg-warning text-dark': ticket.estado === 'En Progreso',
-                                            'bg-success': ticket.estado === 'Resuelto'
+                                            'bg-primary': ticket.estado_nombre === 'Pendiente',
+                                            'bg-warning text-dark': ticket.estado_nombre === 'En proceso',
+                                            'bg-success': ticket.estado_nombre === 'Resuelto'
                                         }">
-                                        {{ ticket.estado }}
+                                        {{ ticket.estado_nombre }}
                                     </span>
                             </td>
                             <td class="px-4 py-3 text-muted small">{{ ticket.fecha }}</td>
@@ -197,11 +274,50 @@ const verTicket = (id) => {
                                 </button>
                             </td>
                         </tr>
+                        <tr v-if="ticketsFiltrados.length === 0">
+                            <td colspan="6" class="text-center py-5 text-muted">No se encontraron tickets.</td>
+                        </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
         </div>
+
+        <div v-if="mostrarModalTicket" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                        <h5 class="modal-title fw-bold text-dark">🎧 Nuevo Ticket de Soporte</h5>
+                        <button type="button" class="btn-close shadow-none" @click="cerrarModalTicket"></button>
+                    </div>
+
+                    <div class="modal-body px-4 py-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">¿Para qué negocio es?</label>
+                            <select v-model="formularioTicket.id_negocio" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_negocio}">
+                                <option value="" disabled>Selecciona tu negocio...</option>
+                                <option v-for="negocio in misNegocios" :key="negocio.id" :value="negocio.id">
+                                    {{ negocio.nombre }}
+                                </option>
+                            </select>
+                            <div class="invalid-feedback fw-medium">{{ errores.id_negocio }}</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Asunto / Problema</label>
+                            <input type="text" v-model="formularioTicket.asunto" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. No puedo agregar servicios" :class="{'is-invalid': errores.asunto}">
+                            <div class="invalid-feedback fw-medium">{{ errores.asunto }}</div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarTicket">Levantar Ticket</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </Layout>
 </template>

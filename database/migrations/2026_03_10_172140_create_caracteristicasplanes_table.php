@@ -71,17 +71,6 @@ return new class extends Migration
                 'titulo' => 'whatsapp_creditos_iniciales',
                 'valor' => '200',
             ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'created_at',
-                'valor' => Carbon::now(),
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'updated_at',
-                'valor' => Carbon::now(),
-            ],
-
 
             [
                 'id_plan' => '2',
@@ -133,17 +122,6 @@ return new class extends Migration
                 'titulo' => 'whatsapp_creditos_iniciales',
                 'valor' => '200',
             ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'created_at',
-                'valor' => Carbon::now(),
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'updated_at',
-                'valor' => Carbon::now(),
-            ],
-
 
             [
                 'id_plan' => '3',
@@ -194,16 +172,6 @@ return new class extends Migration
                 'id_plan' => '3',
                 'titulo' => 'whatsapp_creditos_iniciales',
                 'valor' => '500',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'created_at',
-                'valor' => Carbon::now(),
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'updated_at',
-                'valor' => Carbon::now(),
             ],
         ]);
 

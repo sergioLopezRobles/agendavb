@@ -29,12 +29,15 @@ class DashboardController extends Controller
                 $globalFuncion = new GlobalFuncion();
                 $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado[0]->id_plan);
 
+                $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
+
                 return response()->json([
                     'valid' => true,
                     // 2. se anade [0] para enviar el objeto limpio a Vue, no un arreglo
                     'planAdquirido' => $planAdquirido,
                     'usuarioLoggeado' => $usuarioLoggeado[0],
-                    'cantidadNegocios' => $cantidadNegocios // 👇 LO ENVIAMOS A VUE
+                    'cantidadNegocios' => $cantidadNegocios, // 👇 LO ENVIAMOS A VUE
+                    'prioridadesTicket' => $prioridadesTicket
                 ]);
             }else{
                 return response()->json([
@@ -145,12 +148,25 @@ class DashboardController extends Controller
     public function misNegocios(Request $request){
         $idUsuario = Auth::id();
 
-        // 1. Obtenemos datos del usuario y su plan
+        //Obtenemos datos del usuario y su plan
         $usuarioLoggeado = DB::table('users')->select('name', 'email', 'id_plan')->where('id', $idUsuario)->first();
         $planAdquirido = DB::table('planes')->where('id', $usuarioLoggeado->id_plan)->first();
 
-        // 2. Traemos TODOS los negocios que le pertenecen a este usuario
+        //Traemos TODOS los negocios que le pertenecen a este usuario
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
+
+        //inserta los horarios a cada negocio antes de enviarlos a Vue
+        foreach ($negocios as $negocio) {
+            $horariosDB = DB::table('horarios_negocios')->where('id_negocio', $negocio->id)->get();
+            $horariosArray = [];
+
+            foreach ($horariosDB as $horario) {
+                // Arma el string exacto que Vue necesita ("08:00 - 09:00")
+                $horariosArray[] = $horario->hora_inicio . ' - ' . $horario->hora_fin;
+            }
+
+            $negocio->horarios = $horariosArray;
+        }
 
         return response()->json([
             'valid' => true,
@@ -163,14 +179,47 @@ class DashboardController extends Controller
     public function actualizarNegocio(Request $request, $id){
         try {
             // Seguridad: Aseguramos que el usuario solo edite SU propio negocio
-            DB::table('negocios')
+            $negocioMio = DB::table('negocios')
                 ->where('id', $id)
                 ->where('id_usuario', Auth::id())
+                ->first();
+
+            if(!$negocioMio){
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'No tienes permisos para editar este negocio'
+                ]);
+            }
+
+            // Actualizamos los datos básicos
+            DB::table('negocios')
+                ->where('id', $id)
                 ->update([
                     'nombre' => $request->nombre,
                     'telefono' => $request->telefono,
                     'updated_at' => Carbon::now()
                 ]);
+
+            //ACTUALIZAMOS LOS HORARIOS
+            // 1. Borramos todos los horarios viejos de este negocio
+            DB::table('horarios_negocios')->where('id_negocio', $id)->delete();
+
+            // 2. Insertamos los nuevos que mandó Vue
+            if ($request->has('horarios') && is_array($request->horarios)) {
+                foreach($request->horarios as $horario){
+                    $horas = explode(' - ', $horario); // Partimos "08:00 - 09:00" en dos
+
+                    if (count($horas) == 2) {
+                        DB::table('horarios_negocios')->insert([
+                            'id_negocio' => $id,
+                            'hora_inicio' => trim($horas[0]),
+                            'hora_fin' => trim($horas[1]),
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ]);
+                    }
+                }
+            }
 
             return response()->json([
                 'valid' => true,

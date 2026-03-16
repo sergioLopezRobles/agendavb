@@ -16,74 +16,45 @@ const props = defineProps({
 
 const mostrarModal = ref(false)
 
-// Variables para el flujo de verificación
 const codigoEnviado = ref(true)
 const numeroVerificado = ref(true)
 
-// Estado del formulario
 const formulario = reactive({
     nombre: '',
     telefono: '',
-    //email: '',
-    hora_inicio: '',
-    hora_fin: '',
+    email: '',
     slug: ''
 })
 
 const errores = reactive({})
 
-// Llave Pública de Stripe
 const stripePromise = loadStripe('pk_test_51T8vO4CPQ2Qy65AdX1JGvoLFng7dtqBIWCaWAbVENn8JNGyQbYmC6hfFjdStUT2AAdRUOyLz6E35IqdlkWfglDQ5009NWtv54j');
 let stripe = null;
 let cardElement = null;
-const errorTarjeta = ref(''); // Para mostrar si meten una tarjeta inválida
+const errorTarjeta = ref('');
 
 const horariosDisponibles = [
-    "00:00 - 01:00",
-    "01:00 - 02:00",
-    "02:00 - 03:00",
-    "03:00 - 04:00",
-    "04:00 - 05:00",
-    "05:00 - 06:00",
-    "06:00 - 07:00",
-    "07:00 - 08:00",
-    "08:00 - 09:00",
-    "09:00 - 10:00",
-    "10:00 - 11:00",
-    "11:00 - 12:00",
-    "12:00 - 13:00",
-    "13:00 - 14:00",
-    "14:00 - 15:00",
-    "15:00 - 16:00",
-    "16:00 - 17:00",
-    "17:00 - 18:00",
-    "18:00 - 19:00",
-    "19:00 - 20:00",
-    "20:00 - 21:00",
-    "21:00 - 22:00",
-    "22:00 - 23:00",
-    "23:00 - 24:00"
+    "00:00 - 01:00", "01:00 - 02:00", "02:00 - 03:00", "03:00 - 04:00",
+    "04:00 - 05:00", "05:00 - 06:00", "06:00 - 07:00", "07:00 - 08:00",
+    "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+    "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00",
+    "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00", "19:00 - 20:00",
+    "20:00 - 21:00", "21:00 - 22:00", "22:00 - 23:00", "23:00 - 24:00"
 ]
 
-const horarioSeleccionado = ref("")
 const horarios = ref([])
 
-function agregarHorario() {
-
-    if(!horarioSeleccionado.value) return
-
-    if(horarios.value.includes(horarioSeleccionado.value)){
-        alert("Ese horario ya fue agregado")
-        return
+// NUEVA FUNCIÓN: Agrega o quita el horario al darle clic (Toggle)
+function toggleHorario(hora) {
+    const index = horarios.value.indexOf(hora)
+    if (index === -1) {
+        horarios.value.push(hora)
+        horarios.value.sort() // Mantiene las horas ordenadas
+    } else {
+        horarios.value.splice(index, 1)
     }
 
-    horarios.value.push(horarioSeleccionado.value)
-
-    horarioSeleccionado.value = ""
-}
-
-function eliminarHorario(index){
-    horarios.value.splice(index,1)
+    if(errores.horarios) delete errores.horarios
 }
 
 onMounted(() => {
@@ -104,12 +75,10 @@ const abrirModal = () => {
     mostrarModal.value = true;
     errorTarjeta.value = '';
 
-    // Esperamos un instante a que el modal exista en el HTML
     setTimeout(async () => {
         stripe = await stripePromise;
         const elements = stripe.elements();
 
-        // Creamos el diseño del input de la tarjeta
         cardElement = elements.create('card', {
             style: {
                 base: {
@@ -121,10 +90,8 @@ const abrirModal = () => {
             }
         });
 
-        // Lo montamos en el div vacío que vamos a crear abajo
         cardElement.mount('#card-element');
 
-        // Escuchamos si hay errores en vivo (ej. tarjeta vencida)
         cardElement.on('change', (event) => {
             errorTarjeta.value = event.error ? event.error.message : '';
         });
@@ -139,9 +106,8 @@ const cerrarModal = () => {
 const limpiarFormulario = () => {
     formulario.nombre = ''
     formulario.telefono = ''
-    formulario.hora_inicio = ''
-    formulario.hora_fin = ''
-    formulario.codigo_verificacion = ''
+    formulario.slug = ''
+    horarios.value = []
     codigoEnviado.value = false
     numeroVerificado.value = false
     Object.keys(errores).forEach(key => delete errores[key])
@@ -161,16 +127,8 @@ const validarFormulario = () => {
         esValido = false
     }
 
-    if (!formulario.hora_inicio) {
-        errores.hora_inicio = 'Selecciona la hora de apertura.'
-        esValido = false
-    }
-
-    if (!formulario.hora_fin) {
-        errores.hora_fin = 'Selecciona la hora de cierre.'
-        esValido = false
-    } else if (formulario.hora_inicio && formulario.hora_fin <= formulario.hora_inicio) {
-        errores.hora_fin = 'La hora de cierre debe ser posterior a la de apertura.'
+    if (horarios.value.length === 0) {
+        errores.horarios = 'Debes agregar al menos un horario de atención.'
         esValido = false
     }
 
@@ -192,8 +150,6 @@ const formRegistrarPlanNegocio = async () => {
                 nombre: formulario.nombre,
                 email: formulario.email,
                 telefono: formulario.telefono,
-                hora_inicio: formulario.hora_inicio,
-                hora_fin: formulario.hora_fin,
                 slug: formulario.slug,
                 horarios: horarios.value,
             })
@@ -204,7 +160,6 @@ const formRegistrarPlanNegocio = async () => {
         if(data.valid){
             window.$toast.show(data.message, 'success', 5000)
             cerrarModal()
-
             window.location.reload()
         }else{
             window.$toast.show(data.message, 'warning', 5000)
@@ -232,26 +187,26 @@ const formRegistrarPlanNegocio = async () => {
                 </h4>
 
                 <h2 class="text-primary fw-bold mb-2 display-6">
-                    ${{ plan.caracteristicas.precio }}
+                    ${{ plan.caracteristicas?.precio }}
                     <span class="text-muted fs-6 fw-normal">/mes</span>
                 </h2>
 
-                <p class="text-secondary mb-4">{{ plan.caracteristicas.descripcion }}</p>
+                <p class="text-secondary mb-4">{{ plan.caracteristicas?.descripcion }}</p>
 
                 <hr class="text-muted opacity-25 mb-4">
 
                 <ul class="list-unstyled text-start mb-4 flex-grow-1">
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">📅</span>
-                        <span class="text-secondary fw-medium">Intervalo: {{ plan.caracteristicas.intervalo_citas_minutos }} min</span>
+                        <span class="text-secondary fw-medium">Intervalo: {{ plan.caracteristicas?.intervalo_citas_minutos }} min</span>
                     </li>
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">⏰</span>
-                        <span class="text-secondary fw-medium">Recordatorio: {{ plan.caracteristicas.recordatorio_minutos }} min antes</span>
+                        <span class="text-secondary fw-medium">Recordatorio: {{ plan.caracteristicas?.recordatorio_minutos }} min antes</span>
                     </li>
                     <li class="mb-3 d-flex align-items-center">
                         <span class="fs-5 me-3">💬</span>
-                        <span class="text-secondary fw-medium">WhatsApp: {{ plan.caracteristicas.whatsapp_creditos_iniciales }} créditos</span>
+                        <span class="text-secondary fw-medium">WhatsApp: {{ plan.caracteristicas?.whatsapp_creditos_iniciales }} créditos</span>
                     </li>
                 </ul>
 
@@ -296,7 +251,7 @@ const formRegistrarPlanNegocio = async () => {
                                 <h5 class="fw-bold text-primary mb-0">{{ plan.nombre }}</h5>
                             </div>
                             <div class="text-end">
-                                <h4 class="fw-bold mb-0 text-dark">${{ plan.caracteristicas.precio }} <small class="text-muted fs-6 fw-normal">/mes</small></h4>
+                                <h4 class="fw-bold mb-0 text-dark">${{ plan.caracteristicas?.precio }} <small class="text-muted fs-6 fw-normal">/mes</small></h4>
                             </div>
                         </div>
 
@@ -336,67 +291,40 @@ const formRegistrarPlanNegocio = async () => {
                                 <div class="text-danger small mt-1 fw-medium" v-if="errores.telefono">{{ errores.telefono }}</div>
                             </div>
 
-                            <div class="row g-3 mt-2">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary">Hora de Apertura</label>
-                                    <input
-                                        type="time"
-                                        v-model="formulario.hora_inicio"
-                                        class="form-control form-control-lg bg-light border-0 shadow-sm"
-                                        :class="{ 'is-invalid': errores.hora_inicio }"
-                                    >
-                                    <div class="invalid-feedback fw-medium">{{ errores.hora_inicio }}</div>
+                            <div class="mb-3 mt-4 pt-3 border-top">
+                                <label class="form-label fw-semibold text-secondary mb-2">
+                                    Horarios de Atención
+                                    <span class="text-muted small fw-normal ms-2">(Haz clic para agregar o quitar)</span>
+                                </label>
+
+                                <div class="border rounded-3 p-3 bg-light shadow-sm" :class="{'border-danger': errores.horarios}">
+                                    <div class="d-flex flex-wrap gap-2" style="max-height: 160px; overflow-y: auto;">
+                                        <button
+                                            v-for="hora in horariosDisponibles"
+                                            :key="hora"
+                                            type="button"
+                                            class="btn btn-sm rounded-pill fw-medium transition-all"
+                                            :class="horarios.includes(hora) ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white text-dark'"
+                                            @click="toggleHorario(hora)"
+                                        >
+                                            <span v-if="horarios.includes(hora)" class="me-1">✓</span>
+                                            <span v-else class="me-1">🕒</span>
+                                            {{ hora }}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold text-secondary">Hora de Cierre</label>
-                                    <input
-                                        type="time"
-                                        v-model="formulario.hora_fin"
-                                        class="form-control form-control-lg bg-light border-0 shadow-sm"
-                                        :class="{ 'is-invalid': errores.hora_fin }"
-                                    >
-                                    <div class="invalid-feedback fw-medium">{{ errores.hora_fin }}</div>
-                                </div>
+                                <div class="text-danger small fw-medium mt-2" v-if="errores.horarios">{{ errores.horarios }}</div>
                             </div>
 
-                            <select v-model="horarioSeleccionado">
-                                <option value="">Selecciona horario</option>
-
-                                <option
-                                    v-for="hora in horariosDisponibles"
-                                    :key="hora"
-                                    :value="hora"
-                                >
-                                    {{hora}}
-                                </option>
-
-                            </select>
-
-                            <button type="button" @click="agregarHorario">
-                                Agregar
-                            </button>
-
-
-                            <div v-for="(hora,index) in horarios" :key="index">
-
-                                {{hora}}
-
-                                <button type="button" @click="eliminarHorario(index)">
-                                    X
-                                </button>
-
-                            </div>
-
-                            <div v-if="plan.id == 3" class="col-md-12 mt-3">
+                            <div v-if="plan.id == 3" class="col-md-12 mt-4">
                                 <label class="form-label fw-semibold text-secondary">URL DEL NEGOCIO</label>
-                                <div class="input-group has-validation">
-                                    <span class="input-group-text">www.agendavb/</span>
-                                    <input type="text" v-model="formulario.slug" class="form-control form-control-lg" placeholder="barberia-lopez" required>
+                                <div class="input-group has-validation shadow-sm">
+                                    <span class="input-group-text bg-white border-end-0 text-muted">www.agendavb/</span>
+                                    <input type="text" v-model="formulario.slug" class="form-control form-control-lg border-start-0" placeholder="barberia-lopez" required>
                                 </div>
                             </div>
 
                             <div class="mt-4 pt-3 border-top d-flex justify-content-end">
-                                <button type="button" class="btn btn-light me-2 fw-bold" @click="cerrarModal">Cancelar</button>
                                 <button type="submit" class="btn btn-primary fw-bold px-4">Guardar Negocio</button>
                             </div>
 

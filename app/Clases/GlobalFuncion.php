@@ -38,4 +38,15 @@ class GlobalFuncion
         return $valor;
     }
 
+    public static function generarIdRandom($length)
+    {
+        $caracteres = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $charactersLength = strlen($caracteres);
+        $randomId = '';
+        for ($i = 0; $i < $length; $i++) {
+            $randomId .= $caracteres[rAND(0, $charactersLength - 1)];
+        }
+        return $randomId;
+    }
+
 }
