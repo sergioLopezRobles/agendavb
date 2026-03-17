@@ -11,6 +11,9 @@
         "vite": "^5.4.21"
     },
     "dependencies": {
+        "@fullcalendar/daygrid": "^6.1.20",
+        "@fullcalendar/interaction": "^6.1.20",
+        "@fullcalendar/vue3": "^6.1.20",
         "@stripe/stripe-js": "^8.9.0",
         "@vitejs/plugin-vue": "^5.2.4",
         "pinia": "^3.0.4",
