@@ -53,4 +53,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //RUTAS PARA MODULO TICKETS
     Route::get('/tickets', [TicketController::class, 'index']);
     Route::post('/tickets', [TicketController::class, 'store']);
+
+    //PUT para conectar Vue con el nuevo update
+    Route::put('/tickets/{id}', [TicketController::class, 'update']);
 });

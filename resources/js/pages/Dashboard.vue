@@ -66,7 +66,7 @@ const eventMostrarTodosPlanes = async () => {
                     <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-primary">
                         <div class="card-body">
                             <h6 class="text-muted fw-bold mb-2">Citas Hoy</h6>
-                            <h3 class="fw-bold mb-0">12</h3>
+                            <h3 class="fw-bold mb-0">...</h3>
                         </div>
                     </div>
                 </div>

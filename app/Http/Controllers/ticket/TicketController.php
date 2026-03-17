@@ -93,4 +93,28 @@ class TicketController extends Controller
             ], 500);
         }
     }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            DB::table('ticket_soporte_usuarios_negocios')
+                ->where('id', $id)
+                ->update([
+                    'id_prioridad' => $request->id_prioridad,
+                    'id_estado' => $request->id_estado,
+                    'updated_at' => Carbon::now()
+                ]);
+
+            return response()->json([
+                'valid' => true,
+                'message' => 'Ticket actualizado correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Error al actualizar el ticket: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
