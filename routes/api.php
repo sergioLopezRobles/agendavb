@@ -6,7 +6,8 @@ use App\Http\Controllers\dashboard\DashboardController;
 use App\Http\Controllers\plan\PlanController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\servicios\ServicioController;
+use App\Http\Controllers\ticket\TicketController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -42,4 +43,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Rutas del Módulo de Negocios
     Route::get('/mis-negocios', [DashboardController::class, 'misNegocios']);
     Route::put('/negocios/{id}', [DashboardController::class, 'actualizarNegocio']);
+
+    // RUTAS PARA EL CRUD DE SERVICIOS
+    Route::get('/negocios/{id}/servicios', [ServicioController::class, 'obtenerServicios']);
+    Route::post('/servicios', [ServicioController::class, 'store']);
+    Route::put('/servicios/{id}', [ServicioController::class, 'update']);
+    Route::delete('/servicios/{id}', [ServicioController::class, 'destroy']);
+
+    //RUTAS PARA MODULO TICKETS
+    Route::get('/tickets', [TicketController::class, 'index']);
+    Route::post('/tickets', [TicketController::class, 'store']);
 });
