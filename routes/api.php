@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\api\AuthController;
 use App\Http\Controllers\api\TwilioController;
+use App\Http\Controllers\clientes\CitasClientesController;
 use App\Http\Controllers\dashboard\DashboardController;
 use App\Http\Controllers\plan\PlanController;
 use Illuminate\Http\Request;
@@ -27,6 +28,11 @@ Route::get('/planes',[PlanController::class,'verplanes'])->name('plan.verplanes'
 
 Route::post('/register',[AuthController::class,'register']);
 Route::post('/login',[AuthController::class,'login']);
+
+// RUTAS DEL MODULO CITASCLIENTES
+Route::get('/citasclientes/{slug}',[CitasClientesController::class,'citasclientes']);
+Route::post('/registrar-cita-cliente',[CitasClientesController::class,'registrarcitacliente']);
+Route::post('/horarios-disponibles',[CitasClientesController::class,'horariosdisponibles']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
