@@ -1,15 +1,26 @@
 <script setup>
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
 const isSidebarExpanded = ref(true);
 
-//RECIBIR LOS DATOS DE LA VISTA QUE ESTE USANDO LAYOUT
+// recibir los datos de la vista que este usando layout
 const props = defineProps({
     usuarioLoggeado: Object,
     planAdquirido: Object
 });
+
+// --> leemos la memoria local de forma instantanea para evitar el parpadeo
+const tienePlan = ref(localStorage.getItem('userHasPlan') === 'true');
+
+// --> vigilamos cuando la base de datos responda para guardar el dato en memoria
+watch(() => props.planAdquirido, (nuevoValor) => {
+    if (nuevoValor && nuevoValor.id) {
+        tienePlan.value = true;
+        localStorage.setItem('userHasPlan', 'true');
+    }
+}, { immediate: true });
 
 const toggleSidebar = () => {
     isSidebarExpanded.value = !isSidebarExpanded.value;
@@ -28,9 +39,11 @@ const logout = async () => {
     } catch (error) {
         console.log(error);
     }
+    // limpiamos toda la memoria al salir
     localStorage.removeItem('token');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('planSeleccionado');
+    localStorage.removeItem('userHasPlan');
     router.push('/');
 };
 </script>
@@ -52,33 +65,36 @@ const logout = async () => {
                     </router-link>
                 </li>
 
-                <li v-if="planAdquirido" class="nav-item mt-2 pt-2 border-top">
+                <li v-if="tienePlan" class="nav-item mt-2 pt-2 border-top">
                     <small class="text-muted fw-bold ms-3 menu-text d-block mb-2">MÓDULOS</small>
                 </li>
 
-                <li v-if="planAdquirido" class="nav-item">
+                <li v-if="tienePlan" class="nav-item">
                     <router-link to="/negocios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/negocios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
                         <span class="fs-3 me-3">🏪</span>
                         <span class="menu-text fw-medium">Mis Negocios</span>
                     </router-link>
                 </li>
 
-                <li v-if="planAdquirido" class="nav-item">
+                <li v-if="tienePlan" class="nav-item">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-3 me-3">📆</span>
                         <span class="menu-text fw-medium">Agenda Digital</span>
                     </a>
                 </li>
-                <li v-if="planAdquirido" class="nav-item">
+                <li v-if="tienePlan" class="nav-item">
                     <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-3 me-3">👥</span>
                         <span class="menu-text fw-medium">Usuarios y Roles</span>
                     </a>
                 </li>
-                <router-link to="/soporte" class="nav-link text-dark d-flex align-items-center mb-2 py-2 px-3 rounded-3" active-class="bg-primary bg-opacity-10 text-primary fw-bold">
-                    <span class="fs-3 me-2">🎧</span>
-                    <span class="menu-text fw-medium">Centro de Soporte</span>
-                </router-link>
+
+                <li v-if="tienePlan" class="nav-item">
+                    <router-link to="/soporte" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/soporte' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                        <span class="fs-3 me-3">🎧</span>
+                        <span class="menu-text fw-medium">Soporte / Tickets</span>
+                    </router-link>
+                </li>
             </ul>
         </div>
 

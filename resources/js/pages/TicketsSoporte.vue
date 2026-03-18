@@ -146,8 +146,64 @@ const guardarTicket = async () => {
     }
 };
 
-const verTicket = (id) => {
-    console.log("ABRIENDO DETALLES DEL TICKET:", id);
+// --> funcion para abrir el modal con los datos cargados
+const verTicket = (ticket) => {
+    ticketRevisar.id = ticket.id;
+    ticketRevisar.asunto = ticket.asunto;
+    ticketRevisar.negocio_nombre = ticket.negocio_nombre;
+    // si la prioridad es nula, lo dejamos vacio para que seleccione una
+    ticketRevisar.id_prioridad = ticket.id_prioridad || '';
+    ticketRevisar.id_estado = ticket.id_estado;
+
+    mostrarModalRevisar.value = true;
+};
+
+const cerrarModalRevisar = () => {
+    mostrarModalRevisar.value = false;
+};
+
+// --> variables para el modal de revision de tickets
+const mostrarModalRevisar = ref(false);
+const ticketRevisar = reactive({
+    id: '',
+    asunto: '',
+    negocio_nombre: '',
+    id_prioridad: '',
+    id_estado: ''
+});
+
+// --> funcion para enviar la actualizacion a laravel
+const actualizarTicket = async () => {
+    if (!ticketRevisar.id_prioridad || !ticketRevisar.id_estado) {
+        window.$toast.show('Debes seleccionar prioridad y estado', 'warning', 3000);
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tickets/${ticketRevisar.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                id_prioridad: ticketRevisar.id_prioridad,
+                id_estado: ticketRevisar.id_estado
+            })
+        });
+
+        const data = await response.json();
+
+        if(data.valid) {
+            window.$toast.show(data.message, 'success', 4000);
+            cerrarModalRevisar();
+            cargarDatosTickets(); // recargamos la tabla para ver los cambios
+        } else {
+            window.$toast.show(data.message, 'warning', 4000);
+        }
+    } catch (error) {
+        window.$toast.show('Error al actualizar el ticket', 'danger', 4000);
+    }
 };
 </script>
 
@@ -206,7 +262,7 @@ const verTicket = (id) => {
                     <div class="col-md-4">
                         <div class="input-group shadow-sm rounded-3">
                             <span class="input-group-text bg-white border-end-0 text-muted">🔍</span>
-                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar por ID, asunto o cliente...">
+                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar por ID, asunto, cliente o negocio...">
                         </div>
                     </div>
                     <div class="col-md-8 text-end">
@@ -240,7 +296,7 @@ const verTicket = (id) => {
                         </tr>
                         </thead>
                         <tbody>
-                        <tr v-for="ticket in ticketsFiltrados" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket.id)">
+                        <tr v-for="ticket in ticketsFiltrados" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket)">
                             <td class="px-4 py-3 fw-bold text-primary">{{ ticket.id }}</td>
                             <td class="px-4 py-3">
                                 <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">{{ ticket.asunto }}</div>
@@ -314,6 +370,48 @@ const verTicket = (id) => {
 
                     <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
                         <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarTicket">Levantar Ticket</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalRevisar" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg rounded-4">
+
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                        <h5 class="modal-title fw-bold text-dark">Revisar Ticket {{ ticketRevisar.id }}</h5>
+                        <button type="button" class="btn-close shadow-none" @click="cerrarModalRevisar"></button>
+                    </div>
+
+                    <div class="modal-body px-4 py-4">
+                        <div class="mb-4 p-3 bg-light rounded-3 border">
+                            <p class="text-muted small mb-1">Negocio: <span class="fw-bold text-dark">{{ ticketRevisar.negocio_nombre }}</span></p>
+                            <p class="text-muted small mb-0">Asunto: <span class="fw-bold text-dark">{{ ticketRevisar.asunto }}</span></p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Asignar Prioridad</label>
+                            <select v-model="ticketRevisar.id_prioridad" class="form-select form-select-lg bg-light border-0 shadow-sm">
+                                <option value="" disabled>Selecciona la prioridad...</option>
+                                <option v-for="prioridad in prioridadesTicket" :key="prioridad.id" :value="prioridad.id">
+                                    {{ prioridad.descripcion }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-secondary">Actualizar Estado</label>
+                            <select v-model="ticketRevisar.id_estado" class="form-select form-select-lg bg-light border-0 shadow-sm">
+                                <option v-for="estado in estadosTicket" :key="estado.id" :value="estado.id">
+                                    {{ estado.descripcion }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="actualizarTicket">Actualizar Ticket</button>
                     </div>
                 </div>
             </div>

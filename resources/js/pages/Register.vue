@@ -74,7 +74,7 @@ const register = async () => {
         //registro exitoso
         window.$toast.show(data.message, 'success', 5000)
         localStorage.setItem('token', data.token)
-        // 👇 ESTA ES LA LÍNEA NUEVA MAGICA 👇
+
         localStorage.setItem('userEmail', email.value)
 
         router.push('/dashboard')

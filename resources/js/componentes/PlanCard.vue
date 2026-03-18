@@ -44,12 +44,12 @@ const horariosDisponibles = [
 
 const horarios = ref([])
 
-// NUEVA FUNCIÓN: Agrega o quita el horario al darle clic (Toggle)
+// --> funcion para agregar o quitar horario
 function toggleHorario(hora) {
     const index = horarios.value.indexOf(hora)
     if (index === -1) {
         horarios.value.push(hora)
-        horarios.value.sort() // Mantiene las horas ordenadas
+        horarios.value.sort()
     } else {
         horarios.value.splice(index, 1)
     }
@@ -172,160 +172,174 @@ const formRegistrarPlanNegocio = async () => {
 </script>
 
 <template>
-    <div class="col-md-6 col-lg-4">
+    <div class="col-md-6 col-lg-4 mb-4">
 
-        <div class="card shadow-lg border-0 rounded-4 h-100">
+        <div class="card saas-card h-100 border-0 shadow-sm rounded-3 position-relative bg-white overflow-hidden">
 
-            <div class="card-body p-4 p-md-5 d-flex flex-column text-center">
+            <div class="position-absolute top-0 start-0 w-100 bg-primary" style="height: 4px;"></div>
 
-                <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex justify-content-center align-items-center mx-auto mb-4" style="width: 60px; height: 60px;">
-                    <span class="fs-2 text-primary">🏷️</span>
+            <div class="card-body p-4 p-md-5 d-flex flex-column">
+
+                <div class="mb-4">
+                    <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold text-uppercase mb-3 tracking-wide" style="letter-spacing: 0.5px;">
+                        {{ plan.nombre }}
+                    </span>
+                    <h2 class="fw-bolder text-dark mb-2" style="font-size: 2.8rem;">
+                        ${{ plan.caracteristicas?.precio }}
+                        <span class="text-muted fs-5 fw-normal">/mes</span>
+                    </h2>
+                    <p class="text-secondary mb-0" style="font-size: 0.95rem;">{{ plan.caracteristicas?.descripcion }}</p>
                 </div>
 
-                <h4 class="card-title fw-bold mb-2">
-                    {{ plan.nombre }}
-                </h4>
+                <hr class="text-muted opacity-10 mb-4">
 
-                <h2 class="text-primary fw-bold mb-2 display-6">
-                    ${{ plan.caracteristicas?.precio }}
-                    <span class="text-muted fs-6 fw-normal">/mes</span>
-                </h2>
-
-                <p class="text-secondary mb-4">{{ plan.caracteristicas?.descripcion }}</p>
-
-                <hr class="text-muted opacity-25 mb-4">
-
-                <ul class="list-unstyled text-start mb-4 flex-grow-1">
-                    <li class="mb-3 d-flex align-items-center">
-                        <span class="fs-5 me-3">📅</span>
-                        <span class="text-secondary fw-medium">Intervalo: {{ plan.caracteristicas?.intervalo_citas_minutos }} min</span>
+                <ul class="list-unstyled mb-4 flex-grow-1">
+                    <li class="mb-3 d-flex align-items-start">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 mt-1 flex-shrink-0" style="width: 24px; height: 24px;">
+                            <span style="font-size: 12px; font-weight: bold;">✓</span>
+                        </div>
+                        <div>
+                            <span class="d-block text-dark fw-medium">Intervalo de citas</span>
+                            <span class="text-muted small">Cada {{ plan.caracteristicas?.intervalo_citas_minutos }} min</span>
+                        </div>
                     </li>
-                    <li class="mb-3 d-flex align-items-center">
-                        <span class="fs-5 me-3">⏰</span>
-                        <span class="text-secondary fw-medium">Recordatorio: {{ plan.caracteristicas?.recordatorio_minutos }} min antes</span>
+                    <li class="mb-3 d-flex align-items-start">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 mt-1 flex-shrink-0" style="width: 24px; height: 24px;">
+                            <span style="font-size: 12px; font-weight: bold;">✓</span>
+                        </div>
+                        <div>
+                            <span class="d-block text-dark fw-medium">Recordatorios automáticos</span>
+                            <span class="text-muted small">{{ plan.caracteristicas?.recordatorio_minutos }} min antes de la cita</span>
+                        </div>
                     </li>
-                    <li class="mb-3 d-flex align-items-center">
-                        <span class="fs-5 me-3">💬</span>
-                        <span class="text-secondary fw-medium">WhatsApp: {{ plan.caracteristicas?.whatsapp_creditos_iniciales }} créditos</span>
+                    <li class="mb-3 d-flex align-items-start">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 mt-1 flex-shrink-0" style="width: 24px; height: 24px;">
+                            <span style="font-size: 12px; font-weight: bold;">✓</span>
+                        </div>
+                        <div>
+                            <span class="d-block text-dark fw-medium">Notificaciones WhatsApp</span>
+                            <span class="text-muted small">{{ plan.caracteristicas?.whatsapp_creditos_iniciales }} créditos mensuales</span>
+                        </div>
                     </li>
                 </ul>
 
             </div>
 
             <div class="card-footer bg-transparent border-0 p-4 pt-0">
-                <button v-if="currentPlanId == plan.id" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3" disabled>
-                    Este es tu plan actual
+                <button v-if="currentPlanId == plan.id" class="btn btn-light text-muted w-100 py-3 fw-bold fs-6 rounded-pill border" disabled>
+                    Plan actual activado
                 </button>
 
-                <button v-else-if="currentPlanId != null" @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3">
-                    Seleccionar plan
+                <button v-else-if="currentPlanId != null" @click="eventPlanSeleccionado" class="btn btn-outline-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn">
+                    Cambiar a este plan
                 </button>
 
-                <button v-else-if="token && planGuardado" @click="abrirModal" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3">
+                <button v-else-if="token && planGuardado" @click="abrirModal" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn shadow-sm">
                     Registrar Negocio
                 </button>
 
-                <button v-else @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3">
-                    Seleccionar plan
+                <button v-else @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn shadow-sm">
+                    Comenzar ahora
                 </button>
             </div>
 
         </div>
 
-        <div v-if="mostrarModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div v-if="mostrarModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
 
-                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                        <h4 class="modal-title fw-bold text-dark d-flex align-items-center">
-                            <span class="fs-3 me-2">🏢</span> Registrar Negocio
-                        </h4>
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4 px-md-5 pt-md-5">
+                        <div>
+                            <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-2">Paso final</span>
+                            <h3 class="modal-title fw-bolder text-dark">Configura tu negocio</h3>
+                        </div>
                         <button type="button" class="btn-close shadow-none" @click="cerrarModal"></button>
                     </div>
 
-                    <div class="modal-body px-4 py-4">
+                    <div class="modal-body px-4 py-4 px-md-5">
 
-                        <div class="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 p-3 rounded-3 mb-4 border border-primary border-opacity-25">
+                        <div class="d-flex justify-content-between align-items-center p-4 rounded-4 mb-4 border" style="background-color: #f8f9fa;">
                             <div>
-                                <span class="badge bg-primary mb-1">Plan Seleccionado</span>
-                                <h5 class="fw-bold text-primary mb-0">{{ plan.nombre }}</h5>
+                                <p class="text-muted small fw-bold mb-1 text-uppercase">Resumen de compra</p>
+                                <h5 class="fw-bold text-dark mb-0">Plan {{ plan.nombre }}</h5>
                             </div>
                             <div class="text-end">
-                                <h4 class="fw-bold mb-0 text-dark">${{ plan.caracteristicas?.precio }} <small class="text-muted fs-6 fw-normal">/mes</small></h4>
+                                <h4 class="fw-bold mb-0 text-primary">${{ plan.caracteristicas?.precio }} <span class="text-muted fs-6 fw-normal">/mes</span></h4>
                             </div>
                         </div>
 
                         <form @submit.prevent="formRegistrarPlanNegocio">
 
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Nombre de tu negocio</label>
                                 <input
                                     type="text"
                                     v-model="formulario.nombre"
-                                    class="form-control form-control-lg bg-light border-0 shadow-sm"
+                                    class="form-control form-control-lg bg-light border-0 px-4"
+                                    style="border-radius: 0.75rem;"
                                     :class="{ 'is-invalid': errores.nombre }"
                                     placeholder="Ej. Clínica Dental Vista Boreal"
                                 >
-                                <div class="invalid-feedback fw-medium">{{ errores.nombre }}</div>
+                                <div class="invalid-feedback fw-medium px-2">{{ errores.nombre }}</div>
                             </div>
 
-                            <div class="mb-4">
-                                <label class="form-label fw-semibold text-secondary">Correo Electrónico (Titular)</label>
-                                <input type="email" v-model="formulario.email" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
-                                <small class="text-muted mt-1 d-block">Este correo está vinculado a tu cuenta de usuario.</small>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label fw-semibold text-secondary">Teléfono de Notificaciones (WhatsApp)</label>
-                                <div class="input-group input-group-lg shadow-sm">
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Correo del titular</label>
+                                    <input type="email" v-model="formulario.email" class="form-control form-control-lg text-muted px-4 border-0" style="background-color: #e9ecef; border-radius: 0.75rem;" disabled>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">WhatsApp de contacto</label>
                                     <input
                                         type="tel"
                                         v-model="formulario.telefono"
-                                        class="form-control bg-light border-0"
+                                        class="form-control form-control-lg bg-light border-0 px-4"
+                                        style="border-radius: 0.75rem;"
                                         :class="{ 'is-invalid': errores.telefono }"
                                         placeholder="10 dígitos"
                                         maxlength="10"
                                         @input="formulario.telefono = formulario.telefono.replace(/\D/g, '')"
                                     >
+                                    <div class="invalid-feedback fw-medium px-2" v-if="errores.telefono">{{ errores.telefono }}</div>
                                 </div>
-                                <div class="text-danger small mt-1 fw-medium" v-if="errores.telefono">{{ errores.telefono }}</div>
                             </div>
 
-                            <div class="mb-3 mt-4 pt-3 border-top">
-                                <label class="form-label fw-semibold text-secondary mb-2">
-                                    Horarios de Atención
-                                    <span class="text-muted small fw-normal ms-2">(Haz clic para agregar o quitar)</span>
+                            <div class="mb-4 pt-2">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">
+                                    Disponibilidad de horarios
+                                    <span class="text-muted fw-normal text-capitalize ms-2">(Selecciona los bloques de atención)</span>
                                 </label>
 
-                                <div class="border rounded-3 p-3 bg-light shadow-sm" :class="{'border-danger': errores.horarios}">
-                                    <div class="d-flex flex-wrap gap-2" style="max-height: 160px; overflow-y: auto;">
+                                <div class="border rounded-4 p-4 bg-white shadow-sm" :class="{'border-danger': errores.horarios}">
+                                    <div class="d-flex flex-wrap gap-2" style="max-height: 180px; overflow-y: auto;">
                                         <button
                                             v-for="hora in horariosDisponibles"
                                             :key="hora"
                                             type="button"
-                                            class="btn btn-sm rounded-pill fw-medium transition-all"
-                                            :class="horarios.includes(hora) ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white text-dark'"
+                                            class="btn btn-sm rounded-pill fw-medium transition-all px-3 py-2 border"
+                                            :class="horarios.includes(hora) ? 'btn-primary border-primary shadow-sm text-white' : 'btn-light border-light text-secondary'"
                                             @click="toggleHorario(hora)"
                                         >
                                             <span v-if="horarios.includes(hora)" class="me-1">✓</span>
-                                            <span v-else class="me-1">🕒</span>
                                             {{ hora }}
                                         </button>
                                     </div>
                                 </div>
-                                <div class="text-danger small fw-medium mt-2" v-if="errores.horarios">{{ errores.horarios }}</div>
+                                <div class="text-danger small fw-medium mt-2 px-2" v-if="errores.horarios">{{ errores.horarios }}</div>
                             </div>
 
-                            <div v-if="plan.id == 3" class="col-md-12 mt-4">
-                                <label class="form-label fw-semibold text-secondary">URL DEL NEGOCIO</label>
-                                <div class="input-group has-validation shadow-sm">
-                                    <span class="input-group-text bg-white border-end-0 text-muted">www.agendavb/</span>
-                                    <input type="text" v-model="formulario.slug" class="form-control form-control-lg border-start-0" placeholder="barberia-lopez" required>
+                            <div v-if="plan.id == 3" class="mb-4 pt-2">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Enlace personalizado</label>
+                                <div class="input-group input-group-lg shadow-sm rounded-4 overflow-hidden">
+                                    <span class="input-group-text bg-light border-0 text-muted px-4">www.agendavb/</span>
+                                    <input type="text" v-model="formulario.slug" class="form-control border-0 bg-light" placeholder="tu-marca-aqui" required>
                                 </div>
+                                <small class="text-muted d-block mt-2 px-2">Este será el link público para tus clientes.</small>
                             </div>
 
-                            <div class="mt-4 pt-3 border-top d-flex justify-content-end">
-                                <button type="submit" class="btn btn-primary fw-bold px-4">Guardar Negocio</button>
+                            <div class="mt-5 d-flex justify-content-end gap-2">
+                                <button type="submit" class="btn btn-primary px-5 py-3 fw-bold rounded-pill shadow-sm saas-btn">Confirmar y guardar</button>
                             </div>
 
                         </form>
@@ -335,3 +349,38 @@ const formRegistrarPlanNegocio = async () => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* --> animaciones y sombras limpias saas */
+.saas-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.saas-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 1rem 3rem rgba(0,0,0,0.1) !important;
+}
+.saas-btn {
+    transition: all 0.2s ease-in-out;
+}
+.saas-btn:hover {
+    transform: scale(1.02);
+}
+.tracking-wide {
+    letter-spacing: 0.05em;
+}
+/* --> personalizar la barra de scroll para los horarios */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+</style>

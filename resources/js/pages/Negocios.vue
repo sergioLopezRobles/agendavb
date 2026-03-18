@@ -760,6 +760,5 @@ const eliminarServicio = async (id) => {
                 </div>
             </div>
         </div>
-
     </Layout>
 </template>
