@@ -1,13 +1,19 @@
 <script setup>
 // IMPORTACIÓN DE FUNCIONES REACTIVAS DE VUE Y COMPONENTES DE FULLCALENDAR
-import {computed, onMounted, ref} from "vue";
+import {computed, onMounted, ref, watch} from "vue";
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import {useRoute} from "vue-router";
+
+const route = useRoute();
+const slug = route.params.slug;
 
 // ALMACENAR CITAS Y SERVICIOS
 const citas = ref([]);
 const servicios = ref([]);
+
+const horariosDisponibles = ref([]);
 
 // CONTROL DE VISIBILIDAD DEL MODAL DE REGISTRO
 const mostrarModalCitaCliente = ref(false);
@@ -19,7 +25,8 @@ const formularioCitaCliente = ref({
     cliente_telefono: "",
     cliente_email: "",
     id_servicio: "",
-    anticipo: ""
+    anticipo: "",
+    hora: ""
 })
 
 // OBJETO PARA GESTIONAR LOS MENSAJES DE ERROR DE VALIDACIÓN
@@ -28,7 +35,8 @@ const erroresFormularioCitaCliente = ref({
     cliente_telefono: "",
     cliente_email: "",
     id_servicio: "",
-    anticipo: ""
+    anticipo: "",
+    hora: ""
 })
 
 // PROPIEDAD COMPUTADA QUE TRANSFORMA LOS DATOS DE LAS CITAS AL FORMATO QUE REQUIERE EL CALENDARIO
@@ -66,8 +74,11 @@ function handleDateClick(info){
         cliente_telefono: "",
         cliente_email: "",
         id_servicio: "",
-        annticipo: ""
+        anticipo: "",
+        hora: ""
     }
+
+    horariosDisponibles.value = [];
 
     // VALIDACIÓN PARA EVITAR REGISTROS EN DOMINGOS
     if(dia === 0){
@@ -89,10 +100,42 @@ const cerrarModalCitaCliente = () => {
 onMounted( () => {
     cargarCitas();
 })
+
+watch(() => formularioCitaCliente.value.id_servicio,async (nuevoServicio) => {
+    horariosDisponibles.value = [];
+    formularioCitaCliente.value.hora = "";
+    if (!nuevoServicio || !formularioCitaCliente.value.fecha) return
+
+    obtenerHorariosDisponibles();
+})
+
+const obtenerHorariosDisponibles = async () => {
+    try{
+        const response = await fetch('/api/horarios-disponibles', {
+            method: 'POST',
+            headers: {
+                'Content-Type' : 'application/json'
+            },
+            body: JSON.stringify({
+                id_servicio: formularioCitaCliente.value.id_servicio,
+                fecha: formularioCitaCliente.value.fecha,
+                slug: slug
+            })
+        });
+        const data = await response.json();
+
+        if (data.valid){
+            horariosDisponibles.value = data.horariosDisponibles;
+        }
+    }catch (error){
+        window.$toast.show('Error al cargar horarios disponibles', 'danger', 5000);
+    }
+}
+
 // FUNCIÓN ASÍNCRONA PARA OBTENER LAS CITAS DESDE LA BD
 const cargarCitas = async () => {
     try{
-        const response = await fetch('/api/citasclientes', {
+        const response = await fetch(`/api/citasclientes/${slug}`, {
            method: 'GET',
            headers: {
                'Content-Type' : 'application/json'
@@ -103,8 +146,7 @@ const cargarCitas = async () => {
         if (data.valid){
             citas.value = data.citas;
             servicios.value = data.servicios;
-            console.log(data.citas);
-            console.log(data.servicios);
+            console.log(slug);
             //window.$toast.show('Se cargaron las citas correctamente', 'success', 5000);
         }
     }catch (error){
@@ -132,7 +174,9 @@ const guardarCitaCliente = async () => {
                 cliente_email: formularioCitaCliente.value.cliente_email,
                 id_servicio: formularioCitaCliente.value.id_servicio,
                 fecha: formularioCitaCliente.value.fecha,
-                anticipo: formularioCitaCliente.value.anticipo
+                anticipo: formularioCitaCliente.value.anticipo,
+                slug: slug,
+                hora: formularioCitaCliente.value.hora
             })
         });
 
@@ -160,7 +204,8 @@ const validarFormularioCitaCliente = () => {
         cliente_telefono: "",
         cliente_email: "",
         id_servicio: "",
-        anticipo: ""
+        anticipo: "",
+        hora: ""
     }
 
     let valido = true;
@@ -184,6 +229,10 @@ const validarFormularioCitaCliente = () => {
     }
     if(!formularioCitaCliente.value.anticipo){
         erroresFormularioCitaCliente.value.anticipo = "El anticipo es obligatorio";
+        valido = false;
+    }
+    if(!formularioCitaCliente.value.hora){
+        erroresFormularioCitaCliente.value.hora = "El horario es obligatorio";
         valido = false;
     }
     return valido;
@@ -228,11 +277,23 @@ const validarFormularioCitaCliente = () => {
                         <select class="form-select" v-model="formularioCitaCliente.id_servicio">
                             <option value="">Seleccionar servicio</option>
                             <option v-for="servicio in servicios" :value="servicio.id">
-                                {{ servicio.nombre }}
+                                {{ servicio.nombre + " - Duración: " + servicio.duracion_minutos + " minutos - Costo: $" + servicio.precio }}
                             </option>
                         </select>
                         <small class="text-danger">
                             {{ erroresFormularioCitaCliente.id_servicio }}
+                        </small>
+                    </div>
+                    <div class="mb-3" v-if="horariosDisponibles.length">
+                        <label>Horario disponible</label>
+                        <select v-model="formularioCitaCliente.hora" class="form-select">
+                            <option value="">Seleccionar horario</option>
+                            <option v-for="hora in horariosDisponibles" :value="hora.inicio">
+                                {{ hora.label }}
+                            </option>
+                        </select>
+                        <small class="text-danger">
+                            {{ erroresFormularioCitaCliente.hora }}
                         </small>
                     </div>
                     <div class="mb-3">

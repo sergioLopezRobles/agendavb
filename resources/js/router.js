@@ -6,7 +6,8 @@ import Dashboard from "./pages/Dashboard.vue";
 import Planes from "./componentes/Planes.vue";
 import PlanCard from "./componentes/PlanCard.vue";
 import Negocios from "./pages/Negocios.vue";
-import TicketsSoporte from "./pages/TicketsSoporte.vue"
+import TicketsSoporte from "./pages/TicketsSoporte.vue";
+import CitasClientes from "./pages/CitasClientes.vue";
 
 const routes = [
     {
@@ -41,6 +42,11 @@ const routes = [
         name: 'Soporte',
         component: TicketsSoporte,
     },
+    {
+        path: '/:slug',
+        component: CitasClientes,
+        //NO SE LE AGREGA meta: { requiresAuth: true }, PARA QUE LA RUTA PUEDA SER PUBLICA
+    },
 ]
 
 const router = createRouter({
@@ -50,7 +56,7 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
-    const publicpages = ['/', '/login', '/register']
+    const publicpages = ['/', '/login', '/register', '/citasclientes']
     const authrequired = to.meta.requiresAuth
     const ispublic = publicpages.includes(to.path)
 
