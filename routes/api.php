@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\servicios\ServicioController;
 use App\Http\Controllers\ticket\TicketController;
+
+use App\Http\Controllers\stripecard\NegocioController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -62,4 +64,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     //PUT para conectar Vue con el nuevo update
     Route::put('/tickets/{id}', [TicketController::class, 'update']);
+
+    //RUTA STIPE
+    Route::post('/registrar-plan-negocio', [NegocioController::class, 'registrarPlanNegocio']);
 });

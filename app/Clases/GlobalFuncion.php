@@ -1,6 +1,6 @@
 <?php
 
-namespace App\clases;
+namespace App\Clases;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
