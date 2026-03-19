@@ -5,10 +5,17 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import {useRoute} from "vue-router";
+import {loadStripe} from "@stripe/stripe-js"; //LIBRERIA DE STRIPE
 
 // CONFIGURACIÓN DE LA RUTA PARA OBTENER EL SLUG DEL NEGOCIO DESDE LA URL
 const route = useRoute();
 const slug = route.params.slug;
+
+//STRIPE
+const stripePromise = loadStripe('pk_test_51SdC6n2Kyc20Semo6gAyq0TTApvii42va2XGLdeOL3njGMLJ6eU2eTNJvsnWV21gQRCjFqUWAdY08LJLF8DimTTm00s87OKbJ3');
+let stripe = null;
+let cardElement = null;
+const errorTarjeta = ref('');
 
 // ALMACENAR CITAS Y SERVICIOS
 const citas = ref([]);
@@ -89,6 +96,29 @@ function handleDateClick(info){
     // ASIGNA LA FECHA SELECCIONADA Y MUESTRA EL MODAL
     formularioCitaCliente.value.fecha = info.dateStr;
     mostrarModalCitaCliente.value = true;
+
+    //CARD ELEMENT DE STRIPE
+    setTimeout(async () => {
+        stripe = await stripePromise;
+        const elements = stripe.elements();
+
+        cardElement = elements.create('card', {
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#32325d',
+                    fontFamily: '"Helvetica Neue", Helvetica, sans-serif','::placeholder': { color: '#aab7c4' },
+                },
+                invalid: { color: '#fa755a', iconColor: '#fa755a' }
+            }
+        });
+
+        cardElement.mount('#card-element');
+
+        cardElement.on('change', (event) => {
+            errorTarjeta.value = event.error ? event.error.message : '';
+        });
+    }, 200);
 }
 
 // CIERRA EL MODAL DE REGISTRO
@@ -167,6 +197,22 @@ const guardarCitaCliente = async () => {
         return;
     }
 
+    // 1. Pedirle a Stripe que procese la tarjeta antes de guardar en tu BD
+    const { paymentMethod, error } = await stripe.createPaymentMethod({
+        type: 'card',
+        card: cardElement,
+        billing_details: {
+            name: formularioCitaCliente.value.cliente_nombre,
+            email: formularioCitaCliente.value.cliente_email,
+        },
+    });
+
+    // Si la tarjeta falla (fondos insuficientes, numero mal, etc), detenemos todo
+    if (error) {
+        errorTarjeta.value = error.message;
+        return;
+    }
+
     try{
         const response = await fetch('/api/registrar-cita-cliente', {
             method: 'POST',
@@ -181,11 +227,28 @@ const guardarCitaCliente = async () => {
                 fecha: formularioCitaCliente.value.fecha,
                 anticipo: formularioCitaCliente.value.anticipo,
                 slug: slug,
-                hora: formularioCitaCliente.value.hora
+                hora: formularioCitaCliente.value.hora,
+                payment_method_id: paymentMethod.id // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE
             })
         });
 
         const data = await response.json();
+
+        if (data.requires_action) {
+            // 🔐 Stripe pide autenticación (3D Secure)
+            const { error, paymentIntent } = await stripe.confirmCardPayment(data.client_secret);
+
+            if (error) {
+                window.$toast.show(error.message, 'danger', 5000);
+                return;
+            }
+
+            if (paymentIntent.status === 'succeeded') {
+                window.$toast.show('¡Pago confirmado!', 'success', 5000);
+            }
+
+            return;
+        }
 
         if(data.valid){
             // SI EL REGISTRO ES EXITOSO, SE RECARGA EL CALENDARIO Y SE CIERRA EL MODAL
@@ -315,6 +378,17 @@ const validarFormularioCitaCliente = () => {
                         <small class="text-danger">
                             {{ erroresFormularioCitaCliente.anticipo }}
                         </small>
+                    </div>
+                    <div class="mb-4 pt-2 border-top">
+                        <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">
+                            💳 Detalles de pago (Modo Prueba)
+                        </label>
+                        <div class="p-3 bg-light border" style="border-radius: 0.75rem;">
+                            <div id="card-element" class="w-100"></div>
+                        </div>
+                        <div class="text-danger small fw-medium mt-2 px-2" v-if="errorTarjeta">
+                            {{ errorTarjeta }}
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

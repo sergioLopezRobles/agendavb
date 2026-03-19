@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\clientes;
 // IMPORTACIÓN DE CLASES NECESARIAS: CONTROLADOR BASE, FACHADA DE BASE DE DATOS Y LOGS
+use App\Clases\GlobalFuncion;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -46,6 +47,27 @@ class CitasClientesController extends Controller
             // VERIFICA SI EL SERVICIO EXISTE EN LA BASE DE DATOS
             if ($servicioSeleccionado != null) {
                 // EXISTE SERVICIO
+
+                //REALIZAR PAGO CON STRIPE
+                $globalFuncion = new GlobalFuncion();
+                $respuestaPago  = $globalFuncion->pagoUnicoStripe($request->cliente_email, $negocio->id, $request->id_servicio, $request->payment_method_id, $servicioSeleccionado[0]->precio);
+
+                if (!$respuestaPago['valid']) {
+                    // 🔥 Si requiere autenticación (3D Secure)
+                    if (isset($respuestaPago['requires_action']) && $respuestaPago['requires_action']) {
+                        return response()->json([
+                            'requires_action' => true,
+                            'client_secret' => $respuestaPago['client_secret']
+                        ]);
+                    }
+
+                    // ❌ Error normal
+                    return response()->json([
+                        'valid' => false,
+                        'message' => $respuestaPago['message']
+                    ], 400);
+                }
+
                 // INSERCIÓN DE LOS DATOS DE LA CITA EN LA TABLA 'CITAS'
                 DB::table('citas')->insert([
                     'id_negocio' => $negocio->id,
