@@ -138,7 +138,24 @@ const validarFormulario = () => {
 const formRegistrarPlanNegocio = async () => {
     if (!validarFormulario()) return
 
-    try{
+    try {
+        // 1. Pedirle a Stripe que procese la tarjeta antes de guardar en tu BD
+        const { paymentMethod, error } = await stripe.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+            billing_details: {
+                name: formulario.nombre,
+                email: formulario.email,
+            },
+        });
+
+        // Si la tarjeta falla (fondos insuficientes, numero mal, etc), detenemos todo
+        if (error) {
+            errorTarjeta.value = error.message;
+            return;
+        }
+
+        // 2. Si la tarjeta pasa, mandamos los datos y el token de Stripe a Laravel
         const response = await fetch('/api/registrar-plan-negocio',{
             method: 'POST',
             headers: {
@@ -152,19 +169,25 @@ const formRegistrarPlanNegocio = async () => {
                 telefono: formulario.telefono,
                 slug: formulario.slug,
                 horarios: horarios.value,
+                payment_method_id: paymentMethod.id // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE
             })
         })
 
         const data = await response.json()
 
         if(data.valid){
-            window.$toast.show(data.message, 'success', 5000)
+            window.$toast.show('¡Pago exitoso y negocio registrado!', 'success', 5000)
             cerrarModal()
-            window.location.reload()
+
+            // 1. DESBLOQUEA LOS MÓDULOS DEL MENÚ LATERAL
+            localStorage.setItem('userHasPlan', 'true')
+
+            // 2. REDIRIGE AL DASHBOARD Y REFRESCAMOS PARA OBTENER LOS DATOS NUEVOS
+            window.location.href = '/dashboard'
         }else{
             window.$toast.show(data.message, 'warning', 5000)
         }
-    }catch (error) {
+    } catch (error) {
         console.error("Error en la petición:", error)
         window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
     }
@@ -336,6 +359,18 @@ const formRegistrarPlanNegocio = async () => {
                                     <input type="text" v-model="formulario.slug" class="form-control border-0 bg-light" placeholder="tu-marca-aqui" required>
                                 </div>
                                 <small class="text-muted d-block mt-2 px-2">Este será el link público para tus clientes.</small>
+                            </div>
+
+                            <div class="mb-4 pt-2 border-top">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">
+                                    💳 Detalles de pago (Modo Prueba)
+                                </label>
+                                <div class="p-3 bg-light border" style="border-radius: 0.75rem;">
+                                    <div id="card-element" class="w-100"></div>
+                                </div>
+                                <div class="text-danger small fw-medium mt-2 px-2" v-if="errorTarjeta">
+                                    {{ errorTarjeta }}
+                                </div>
                             </div>
 
                             <div class="mt-5 d-flex justify-content-end gap-2">
