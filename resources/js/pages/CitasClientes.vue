@@ -6,13 +6,13 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import {useRoute} from "vue-router";
 
+// CONFIGURACIÓN DE LA RUTA PARA OBTENER EL SLUG DEL NEGOCIO DESDE LA URL
 const route = useRoute();
 const slug = route.params.slug;
 
 // ALMACENAR CITAS Y SERVICIOS
 const citas = ref([]);
 const servicios = ref([]);
-
 const horariosDisponibles = ref([]);
 
 // CONTROL DE VISIBILIDAD DEL MODAL DE REGISTRO
@@ -101,14 +101,18 @@ onMounted( () => {
     cargarCitas();
 })
 
+// VIGILANTE (WATCHER) QUE DETECTA CAMBIOS EN EL SERVICIO SELECCIONADO PARA BUSCAR HORARIOS
 watch(() => formularioCitaCliente.value.id_servicio,async (nuevoServicio) => {
     horariosDisponibles.value = [];
     formularioCitaCliente.value.hora = "";
+
+    // SI NO HAY SERVICIO O FECHA SELECCIONADA, NO REALIZA LA BÚSQUEDA
     if (!nuevoServicio || !formularioCitaCliente.value.fecha) return
 
     obtenerHorariosDisponibles();
 })
 
+// PETICIÓN PARA OBTENER LOS HORARIOS LIBRES SEGÚN SERVICIO, FECHA Y NEGOCIO (SLUG)
 const obtenerHorariosDisponibles = async () => {
     try{
         const response = await fetch('/api/horarios-disponibles', {
@@ -135,6 +139,7 @@ const obtenerHorariosDisponibles = async () => {
 // FUNCIÓN ASÍNCRONA PARA OBTENER LAS CITAS DESDE LA BD
 const cargarCitas = async () => {
     try{
+        // SE AGREGO EL SLUG DEL NEGOCIO
         const response = await fetch(`/api/citasclientes/${slug}`, {
            method: 'GET',
            headers: {
@@ -215,12 +220,20 @@ const validarFormularioCitaCliente = () => {
         erroresFormularioCitaCliente.value.cliente_nombre = "El nombre es obligatorio";
         valido = false;
     }
+    const regexTelefono = /^[0-9]{10}$/;
     if(!formularioCitaCliente.value.cliente_telefono){
         erroresFormularioCitaCliente.value.cliente_telefono = "El telefono es obligatorio";
         valido = false;
+    } else if (!regexTelefono.test(formularioCitaCliente.value.cliente_telefono)) {
+        erroresFormularioCitaCliente.value.cliente_telefono = "El teléfono debe tener exactamente 10 dígitos";
+        valido = false;
     }
-    if(!formularioCitaCliente.value.cliente_email){
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formularioCitaCliente.value.cliente_email) {
         erroresFormularioCitaCliente.value.cliente_email = "El email es obligatorio";
+        valido = false;
+    } else if (!regexEmail.test(formularioCitaCliente.value.cliente_email)) {
+        erroresFormularioCitaCliente.value.cliente_email = "El formato de correo no es válido";
         valido = false;
     }
     if(!formularioCitaCliente.value.id_servicio){
@@ -260,7 +273,7 @@ const validarFormularioCitaCliente = () => {
                     </div>
                     <div class="mb-3">
                         <label>Telefono</label>
-                        <input class="form-control" v-model="formularioCitaCliente.cliente_telefono">
+                        <input class="form-control" v-model="formularioCitaCliente.cliente_telefono" maxlength="10">
                         <small class="text-danger">
                             {{ erroresFormularioCitaCliente.cliente_telefono }}
                         </small>

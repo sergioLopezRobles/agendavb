@@ -10,10 +10,11 @@ use Illuminate\Support\Facades\Log;
 
 class CitasClientesController extends Controller
 {
-    public function citasclientes($slug){
-
+    public function citasclientes($slug)
+    {
+        // BUSCA EL NEGOCIO EN LA BASE DE DATOS USANDO EL SLUG DE LA URL
         $negocio = DB::table('negocios')->where('slug', $slug)->first();
-
+        // SI EL NEGOCIO NO EXISTE, DEVUELVE UN ERROR 404
         if (!$negocio) {
             abort(404);
         }
@@ -33,16 +34,17 @@ class CitasClientesController extends Controller
     }
 
     // REGISTRA UNA NUEVA CITA EN LA BASE DE DATOS VALIDANDO LA EXISTENCIA DEL SERVICIO
-    public function registrarcitacliente(Request $request){
+    public function registrarcitacliente(Request $request)
+    {
         try {
-
+            // IDENTIFICA EL NEGOCIO MEDIANTE EL SLUG ENVIADO EN LA PETICIÓN
             $negocio = DB::table('negocios')->where('slug', $request->slug)->first();
 
             // BUSCA EL SERVICIO SOLICITADO PARA OBTENER INFORMACIÓN COMO EL PRECIO
             $servicioSeleccionado = DB::table('servicios')->where('id', $request->id_servicio)->get();
 
             // VERIFICA SI EL SERVICIO EXISTE EN LA BASE DE DATOS
-            if($servicioSeleccionado != null){
+            if ($servicioSeleccionado != null) {
                 // EXISTE SERVICIO
                 // INSERCIÓN DE LOS DATOS DE LA CITA EN LA TABLA 'CITAS'
                 DB::table('citas')->insert([
@@ -52,113 +54,172 @@ class CitasClientesController extends Controller
                     'cliente_telefono' => $request->cliente_telefono,
                     'cliente_email' => $request->cliente_email,
                     'fecha' => $request->fecha,
-                    'hora' => $request->hora,
+                    'hora' => $request->hora,   // HORA SELECCIONADA POR EL CLIENTE
                     'anticipo' => $request->anticipo,
-                    'total' => $servicioSeleccionado[0]->precio,
+                    'total' => $servicioSeleccionado[0]->precio,    // PRECIO OBTENIDO DE LA BD
                     'estado' => '0',
                     'recordatorio_enviado' => '0',
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now()
                 ]);
                 // RETORNO DE CONFIRMACIÓN DE CREACIÓN
-                return response()->json(['valid' => true, 'message' => 'Se creo correctamente la cita']);
+                return response()->json([
+                    'valid' => true,
+                    'message' => 'Se creo correctamente la cita'
+                ]);
             } else {
                 // NO EXISTE SERVICIO
                 // RESPUESTA EN CASO DE QUE EL ID DEL SERVICIO NO SEA VÁLIDO
-                return response()->json(['valid' => false, 'message' => 'No existe el servicio']);
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'No existe el servicio'
+                ]);
             }
 
-        }catch (\Exception $e){
+        } catch (\Exception $e) {
             // CAPTURA DE CUALQUIER ERROR DURANTE EL PROCESO Y RETORNO DE ERROR 500
             return response()->json(['valid' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
+    //CALCULA LOS HORARIOS DISPONIBLES CONSIDERANDO DURACIÓN DEL SERVICIO Y CITAS EXISTENTES
     public function horariosdisponibles(Request $request){
+
         $id_servicio = $request->id_servicio;
         $fecha = $request->fecha;
 
+        // 🔹 Servicio solicitado
         $servicio = DB::table('servicios')->where('id', $id_servicio)->first();
-
         if (!$servicio) {
             return response()->json(['valid' => false, 'message' => 'El servicio no existe']);
         }
 
         $duracionServicio = $servicio->duracion_minutos;
 
-        // OBTENER HORARIOS DEL NEGOCIO
+        // 🔹 Negocio
         $negocio = DB::table('negocios')->where('slug', $request->slug)->first();
         if (!$negocio) {
             return response()->json(['valid' => false, 'message' => 'El negocio no existe']);
         }
-        $horario_negocio = DB::table('horarios_negocios')->where('id_negocio', $negocio->id)->get();
 
-        // Citas ya registradas ese día
+        // 🔹 Horarios del negocio
+        $horarios_negocio = DB::table('horarios_negocios')
+            ->where('id_negocio', $negocio->id)
+            ->get();
+
+        // 🔹 Citas del día
         $citas = DB::table('citas')
             ->where('fecha', $fecha)
             ->where('id_negocio', $negocio->id)
             ->get();
 
+        // 🔹 Obtener duraciones de servicios (evita N+1)
+        $servicios = DB::table('servicios')->pluck('duracion_minutos', 'id');
+
+        // 🔹 Convertir citas en bloques ocupados
+        $bloquesOcupados = [];
+
+        foreach ($citas as $cita) {
+            $inicio = Carbon::parse($cita->hora);
+            $duracion = $servicios[$cita->id_servicio] ?? 0;
+            $fin = $inicio->copy()->addMinutes($duracion);
+
+            $bloquesOcupados[] = [
+                'inicio' => $inicio,
+                'fin' => $fin
+            ];
+        }
+
         $horariosDisponibles = [];
 
-        foreach ($horario_negocio as $horario) {
-            $inicio = Carbon::parse($horario->hora_inicio);
-            $fin = Carbon::parse($horario->hora_fin);
+        foreach ($horarios_negocio as $horario) {
 
-            while($inicio->copy()->addMinutes($duracionServicio) <= $fin){
+            $inicioJornada = Carbon::parse($horario->hora_inicio);
+            $finJornada = Carbon::parse($horario->hora_fin);
 
-                $horaInicio = $inicio->format('H:i');
-                $horaFin = $inicio->copy()->addMinutes($duracionServicio)->format('H:i');
+            // 🔹 Ordenar bloques ocupados
+            usort($bloquesOcupados, function ($a, $b) {
+                return $a['inicio']->gt($b['inicio']);
+            });
 
-                $disponible = true;
+            $cursor = $inicioJornada->copy();
 
-                // ❌ BLOQUEAR HORARIOS OCUPADOS
-                foreach($citas as $cita){
+            foreach ($bloquesOcupados as $bloque) {
 
-                    $inicioCita = Carbon::parse($cita->hora);
+                // Si el bloque está fuera del horario, ignorar
+                if ($bloque['fin'] <= $inicioJornada || $bloque['inicio'] >= $finJornada) {
+                    continue;
+                }
 
-                    // obtener duración del servicio de la cita existente
-                    $servicioCita = DB::table('servicios')
-                        ->where('id', $cita->id_servicio)
-                        ->first();
+                // Ajustar a jornada
+                $inicioBloque = $bloque['inicio']->copy()->max($inicioJornada);
+                $finBloque = $bloque['fin']->copy()->min($finJornada);
 
-                    $finCita = $inicioCita->copy()->addMinutes($servicioCita->duracion_minutos);
+                // 🔹 BLOQUE LIBRE antes de la cita
+                if ($cursor < $inicioBloque) {
 
-                    $inicioNueva = Carbon::parse($horaInicio);
-                    $finNueva = Carbon::parse($horaFin);
+                    $inicioLibre = $cursor->copy();
+                    $finLibre = $inicioBloque->copy();
 
-                    // detectar traslape
-                    if(
-                        $inicioNueva < $finCita &&
-                        $finNueva > $inicioCita
-                    ){
-                        $disponible = false;
-                        break;
+                    // Generar horarios encadenados
+                    while ($inicioLibre->copy()->addMinutes($duracionServicio) <= $finLibre) {
+
+                        // ❌ bloquear horas pasadas
+                        if ($fecha == Carbon::today()->format('Y-m-d') &&
+                            $inicioLibre->lessThan(Carbon::now())) {
+                            $inicioLibre->addMinutes($duracionServicio);
+                            continue;
+                        }
+
+                        $horaInicio = $inicioLibre->format('H:i');
+                        $horaFin = $inicioLibre->copy()->addMinutes($duracionServicio)->format('H:i');
+
+                        $horariosDisponibles[] = [
+                            'inicio' => $horaInicio,
+                            'fin' => $horaFin,
+                            'label' => $horaInicio . ' - ' . $horaFin
+                        ];
+
+                        // 🔥 CLAVE: avanzar por duración (NO intervalos)
+                        $inicioLibre->addMinutes($duracionServicio);
                     }
                 }
 
-                // ❌ BLOQUEAR HORAS PASADAS SI ES HOY
-                if($fecha == Carbon::today()->format('Y-m-d')){
+                // mover cursor al final del bloque ocupado
+                $cursor = $finBloque->copy()->max($cursor);
+            }
 
-                    $ahora = Carbon::now();
+            // 🔹 BLOQUE LIBRE final
+            if ($cursor < $finJornada) {
 
-                    if(Carbon::parse($horaInicio)->lessThan($ahora)){
-                        $disponible = false;
+                $inicioLibre = $cursor->copy();
+                $finLibre = $finJornada->copy();
+
+                while ($inicioLibre->copy()->addMinutes($duracionServicio) <= $finLibre) {
+
+                    if ($fecha == Carbon::today()->format('Y-m-d') &&
+                        $inicioLibre->lessThan(Carbon::now())) {
+                        $inicioLibre->addMinutes($duracionServicio);
+                        continue;
                     }
-                }
 
-                if($disponible){
+                    $horaInicio = $inicioLibre->format('H:i');
+                    $horaFin = $inicioLibre->copy()->addMinutes($duracionServicio)->format('H:i');
 
                     $horariosDisponibles[] = [
                         'inicio' => $horaInicio,
                         'fin' => $horaFin,
                         'label' => $horaInicio . ' - ' . $horaFin
                     ];
+
+                    $inicioLibre->addMinutes($duracionServicio);
                 }
-                $inicio->addMinutes($duracionServicio);
             }
         }
 
-        return response()->json(['valid' => true, 'horariosDisponibles' => $horariosDisponibles]);
+        return response()->json([
+            'valid' => true,
+            'horariosDisponibles' => $horariosDisponibles
+        ]);
     }
 }
