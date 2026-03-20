@@ -77,7 +77,7 @@ class CitasClientesController extends Controller
                     'cliente_email' => $request->cliente_email,
                     'fecha' => $request->fecha,
                     'hora' => $request->hora,   // HORA SELECCIONADA POR EL CLIENTE
-                    'anticipo' => $request->anticipo,
+                    'anticipo' => "50",
                     'total' => $servicioSeleccionado[0]->precio,    // PRECIO OBTENIDO DE LA BD
                     'estado' => '0',
                     'recordatorio_enviado' => '0',

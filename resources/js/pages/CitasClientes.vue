@@ -32,7 +32,6 @@ const formularioCitaCliente = ref({
     cliente_telefono: "",
     cliente_email: "",
     id_servicio: "",
-    anticipo: "",
     hora: ""
 })
 
@@ -42,7 +41,6 @@ const erroresFormularioCitaCliente = ref({
     cliente_telefono: "",
     cliente_email: "",
     id_servicio: "",
-    anticipo: "",
     hora: ""
 })
 
@@ -81,7 +79,6 @@ function handleDateClick(info){
         cliente_telefono: "",
         cliente_email: "",
         id_servicio: "",
-        anticipo: "",
         hora: ""
     }
 
@@ -225,7 +222,6 @@ const guardarCitaCliente = async () => {
                 cliente_email: formularioCitaCliente.value.cliente_email,
                 id_servicio: formularioCitaCliente.value.id_servicio,
                 fecha: formularioCitaCliente.value.fecha,
-                anticipo: formularioCitaCliente.value.anticipo,
                 slug: slug,
                 hora: formularioCitaCliente.value.hora,
                 payment_method_id: paymentMethod.id // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE
@@ -272,7 +268,6 @@ const validarFormularioCitaCliente = () => {
         cliente_telefono: "",
         cliente_email: "",
         id_servicio: "",
-        anticipo: "",
         hora: ""
     }
 
@@ -303,10 +298,6 @@ const validarFormularioCitaCliente = () => {
         erroresFormularioCitaCliente.value.id_servicio = "El servicio es obligatorio";
         valido = false;
     }
-    if(!formularioCitaCliente.value.anticipo){
-        erroresFormularioCitaCliente.value.anticipo = "El anticipo es obligatorio";
-        valido = false;
-    }
     if(!formularioCitaCliente.value.hora){
         erroresFormularioCitaCliente.value.hora = "El horario es obligatorio";
         valido = false;
@@ -319,64 +310,57 @@ const validarFormularioCitaCliente = () => {
     <h1>Calendario de Citas de cliente</h1>
 
     <FullCalendar :options="calendarOptions"/>
-    <div v-if="mostrarModalCitaCliente" class="modal fade show d-block" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Nueva Cita</h5>
-                    <button type="button" class="btn-close" @click="cerrarModalCitaCliente"></button>
+    <div v-if="mostrarModalCitaCliente" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                    <h5 class="modal-title fw-bold text-dark">Nueva Cita</h5>
+                    <button type="button" class="btn-close shadow-none" @click="cerrarModalCitaCliente"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body px-4 py-4">
                     <div class="mb-3">
-                        <label>Nombre del cliente</label>
-                        <input class="form-control" v-model="formularioCitaCliente.cliente_nombre">
-                        <small class="text-danger">
+                        <label class="form-label fw-semibold text-secondary">Nombre del cliente</label>
+                        <input class="form-control form-control-lg bg-light border-0 shadow-sm" v-model="formularioCitaCliente.cliente_nombre">
+                        <small class="text-danger text-muted mt-1 d-block">
                             {{ erroresFormularioCitaCliente.cliente_nombre }}
                         </small>
                     </div>
                     <div class="mb-3">
-                        <label>Telefono</label>
-                        <input class="form-control" v-model="formularioCitaCliente.cliente_telefono" maxlength="10">
-                        <small class="text-danger">
+                        <label class="form-label fw-semibold text-secondary">Telefono</label>
+                        <input class="form-control form-control-lg bg-light border-0 shadow-sm" v-model="formularioCitaCliente.cliente_telefono" maxlength="10">
+                        <small class="text-danger text-muted mt-1 d-block">
                             {{ erroresFormularioCitaCliente.cliente_telefono }}
                         </small>
                     </div>
                     <div class="mb-3">
-                        <label >Email</label>
-                        <input class="form-control" v-model="formularioCitaCliente.cliente_email">
-                        <small class="text-danger">
+                        <label class="form-label fw-semibold text-secondary">Email</label>
+                        <input type="email" class="form-control form-control-lg bg-light border-0 shadow-sm" v-model="formularioCitaCliente.cliente_email">
+                        <small class="text-danger text-muted mt-1 d-block">
                             {{ erroresFormularioCitaCliente.cliente_email }}
                         </small>
                     </div>
                     <div class="mb-3">
-                        <label>Servicio</label>
-                        <select class="form-select" v-model="formularioCitaCliente.id_servicio">
+                        <label class="form-label fw-semibold text-secondary">Servicio</label>
+                        <select class="form-select form-select-lg bg-light border-0 shadow-sm" v-model="formularioCitaCliente.id_servicio">
                             <option value="">Seleccionar servicio</option>
                             <option v-for="servicio in servicios" :value="servicio.id">
                                 {{ servicio.nombre + " - Duración: " + servicio.duracion_minutos + " minutos - Costo: $" + servicio.precio }}
                             </option>
                         </select>
-                        <small class="text-danger">
+                        <small class="text-danger text-muted mt-1 d-block">
                             {{ erroresFormularioCitaCliente.id_servicio }}
                         </small>
                     </div>
                     <div class="mb-3" v-if="horariosDisponibles.length">
-                        <label>Horario disponible</label>
-                        <select v-model="formularioCitaCliente.hora" class="form-select">
+                        <label class="form-label fw-semibold text-secondary">Horario disponible</label>
+                        <select v-model="formularioCitaCliente.hora" class="form-select form-select-lg bg-light border-0 shadow-sm">
                             <option value="">Seleccionar horario</option>
                             <option v-for="hora in horariosDisponibles" :value="hora.inicio">
                                 {{ hora.label }}
                             </option>
                         </select>
-                        <small class="text-danger">
+                        <small class="text-danger text-muted mt-1 d-block">
                             {{ erroresFormularioCitaCliente.hora }}
-                        </small>
-                    </div>
-                    <div class="mb-3">
-                        <label >Anticipo</label>
-                        <input class="form-control" v-model="formularioCitaCliente.anticipo">
-                        <small class="text-danger">
-                            {{ erroresFormularioCitaCliente.anticipo }}
                         </small>
                     </div>
                     <div class="mb-4 pt-2 border-top">
@@ -391,9 +375,9 @@ const validarFormularioCitaCliente = () => {
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @click="cerrarModalCitaCliente">Cancelar</button>
-                    <button type="button" class="btn btn-primary" @click="guardarCitaCliente">Guardar cita</button>
+                <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
+                    <button type="button" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3" @click="cerrarModalCitaCliente">Cancelar</button>
+                    <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarCitaCliente">Guardar cita</button>
                 </div>
             </div>
         </div>
