@@ -6,6 +6,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import {useRoute} from "vue-router";
 import {loadStripe} from "@stripe/stripe-js"; //LIBRERIA DE STRIPE
+import html2pdf from 'html2pdf.js';
 
 // CONFIGURACIÓN DE LA RUTA PARA OBTENER EL SLUG DEL NEGOCIO DESDE LA URL
 const route = useRoute();
@@ -21,6 +22,7 @@ const errorTarjeta = ref('');
 const citas = ref([]);
 const servicios = ref([]);
 const horariosDisponibles = ref([]);
+const nombreNegocio = ref('');
 
 // CONTROL DE VISIBILIDAD DEL MODAL DE REGISTRO
 const mostrarModalCitaCliente = ref(false);
@@ -34,6 +36,22 @@ const formularioCitaCliente = ref({
     id_servicio: "",
     hora: ""
 })
+
+// Propiedad computada para obtener el nombre del servicio seleccionado
+const nombreServicioSeleccionado = computed(() => {
+    // Si aún no han seleccionado un servicio, devolvemos un texto vacío
+    if (!formularioCitaCliente.value.id_servicio) {
+        return 'Sin asignar';
+    }
+
+    // Buscamos dentro de tu arreglo 'servicios' el que coincida con el ID seleccionado
+    const servicio = servicios.value.find(
+        (s) => s.id === formularioCitaCliente.value.id_servicio
+    );
+
+    // Si lo encuentra, devuelve el nombre. (Asegúrate de que 'nombre' sea la columna correcta de tu base de datos)
+    return servicio ? servicio.nombre : 'Servicio desconocido';
+});
 
 // OBJETO PARA GESTIONAR LOS MENSAJES DE ERROR DE VALIDACIÓN
 const erroresFormularioCitaCliente = ref({
@@ -178,6 +196,10 @@ const cargarCitas = async () => {
         if (data.valid){
             citas.value = data.citas;
             servicios.value = data.servicios;
+
+            // AGREGA ESTA LÍNEA AQUÍ:
+            nombreNegocio.value = data.nombre_negocio;
+
             console.log(slug);
             //window.$toast.show('Se cargaron las citas correctamente', 'success', 5000);
         }
@@ -247,6 +269,7 @@ const guardarCitaCliente = async () => {
         }
 
         if(data.valid){
+            generarPDF();
             // SI EL REGISTRO ES EXITOSO, SE RECARGA EL CALENDARIO Y SE CIERRA EL MODAL
             // SE INSERTO CORRECTAMENTE LA CITA
             cargarCitas();
@@ -258,6 +281,26 @@ const guardarCitaCliente = async () => {
     }catch (error){
         window.$toast.show('Error al registrar la cita', 'danger', 5000);
     }
+}
+
+const generarPDF = () => {
+    // 1. Obtenemos el elemento HTML que creamos
+    const elemento = document.getElementById('comprobantePdf');
+
+    // 2. Configuramos las opciones del PDF
+    const opciones = {
+        margin:       1, // Margen de 1 pulgada
+        filename:     `Cita_${formularioCitaCliente.value.cliente_nombre}.pdf`, // Nombre del archivo dinámico
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 }, // Mejora la calidad del texto
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    // 3. Generamos y descargamos el PDF
+    html2pdf().set(opciones).from(elemento).save();
+
+    // 4. (Opcional) Limpiar el formulario o cerrar el modal después de descargar
+    cerrarModalCitaCliente();
 }
 
 // FUNCIÓN DE VALIDACIÓN LÓGICA DE CAMPOS OBLIGATORIOS
@@ -379,6 +422,24 @@ const validarFormularioCitaCliente = () => {
                     <button type="button" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3" @click="cerrarModalCitaCliente">Cancelar</button>
                     <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarCitaCliente">Guardar cita</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div v-show="false">
+        <div id="comprobantePdf" style="padding: 30px; font-family: sans-serif; color: #333;">
+            <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px;">
+                <h1>Comprobante de Reservación: {{ nombreNegocio }}</h1>
+            </div>
+            <div style="margin-top: 20px;">
+                <div style="margin-bottom: 10px;"><b>SERVICIO:</b> {{ nombreServicioSeleccionado }}</div>
+                <div style="margin-bottom: 10px;"><b>CLIENTE:</b> {{ formularioCitaCliente.cliente_nombre }}</div>
+                <div style="margin-bottom: 10px;"><b>TELÉFONO:</b> {{ formularioCitaCliente.cliente_telefono }}</div>
+                <div style="margin-bottom: 10px;"><b>CORREO:</b> {{ formularioCitaCliente.cliente_email }}</div>
+                <hr>
+                <div style="margin-bottom: 10px;"><b>FECHA:</b> {{ formularioCitaCliente.fecha }}</div>
+                <div style="margin-bottom: 10px;"><b>HORA:</b> {{ formularioCitaCliente.hora }}</div>
+                <hr>
+                <div style="margin-bottom: 10px;"><p style="text-align:center;">¡Gracias por su preferencia!</p></div>
             </div>
         </div>
     </div>

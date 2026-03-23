@@ -31,7 +31,7 @@ class CitasClientesController extends Controller
         Log::info('servicios: ' . $servicios);
 
         // RETORNO DE UNA RESPUESTA EN FORMATO JSON CON LOS DATOS Y ESTADO DE VALIDACIÓN
-        return response()->json(['valid' => true, 'citas' => $citas, 'servicios' => $servicios]);
+        return response()->json(['valid' => true, 'citas' => $citas, 'servicios' => $servicios, 'nombre_negocio' => $negocio->nombre]);
     }
 
     // REGISTRA UNA NUEVA CITA EN LA BASE DE DATOS VALIDANDO LA EXISTENCIA DEL SERVICIO
