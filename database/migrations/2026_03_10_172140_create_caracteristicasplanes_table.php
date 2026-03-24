@@ -4,6 +4,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -21,160 +22,48 @@ return new class extends Migration
         });
 
         DB::table('caracteristicasplanes')->insert([
-            [
-                'id_plan' => '1',
-                'titulo' => 'precio',
-                'valor' => '100',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'descripcion',
-                'valor' => 'El basico, puedes crear solo 1 negocio',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'maximonegocios',
-                'valor' => '1',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'limite_citas_mes',
-                'valor' => '100',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'limite_servicios',
-                'valor' => '5',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'intervalo_citas_minutos',
-                'valor' => '20',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'recordatorio_minutos',
-                'valor' => '480',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'permite_anticipo',
-                'valor' => '0',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'permite_reembolso',
-                'valor' => '0',
-            ],
-            [
-                'id_plan' => '1',
-                'titulo' => 'whatsapp_creditos_iniciales',
-                'valor' => '200',
-            ],
+            // --- PLAN BÁSICO (1) ---
+            ['id_plan' => '1', 'titulo' => 'precio', 'valor' => '100'],
+            ['id_plan' => '1', 'titulo' => 'descripcion', 'valor' => 'El basico, puedes crear solo 1 negocio'],
+            ['id_plan' => '1', 'titulo' => 'maximonegocios', 'valor' => '1'],
+            ['id_plan' => '1', 'titulo' => 'limite_citas_mes', 'valor' => '100'],
+            ['id_plan' => '1', 'titulo' => 'limite_servicios_negocios', 'valor' => '5'],
+            ['id_plan' => '1', 'titulo' => 'intervalo_citas_minutos', 'valor' => '20'],
+            ['id_plan' => '1', 'titulo' => 'recordatorio_minutos', 'valor' => '480'],
+            ['id_plan' => '1', 'titulo' => 'permite_anticipo', 'valor' => '0'],
+            ['id_plan' => '1', 'titulo' => 'permite_reembolso', 'valor' => '0'],
+            ['id_plan' => '1', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '200'],
+            ['id_plan' => '1', 'titulo' => 'limite_telefonos_negocios', 'valor' => '3'],
+            ['id_plan' => '1', 'titulo' => 'anticipo_forzoso', 'valor' => '50'],
 
-            [
-                'id_plan' => '2',
-                'titulo' => 'precio',
-                'valor' => '200',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'descripcion',
-                'valor' => 'El medio, puedes crear hasta 3 negocios',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'maximonegocios',
-                'valor' => '3',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'limite_citas_mes',
-                'valor' => '500',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'limite_servicios',
-                'valor' => '15',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'intervalo_citas_minutos',
-                'valor' => '5',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'recordatorio_minutos',
-                'valor' => '180',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'permite_anticipo',
-                'valor' => '1',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'permite_reembolso',
-                'valor' => '0',
-            ],
-            [
-                'id_plan' => '2',
-                'titulo' => 'whatsapp_creditos_iniciales',
-                'valor' => '200',
-            ],
+            // --- PLAN MEDIO (2) ---
+            ['id_plan' => '2', 'titulo' => 'precio', 'valor' => '200'],
+            ['id_plan' => '2', 'titulo' => 'descripcion', 'valor' => 'El medio, puedes crear hasta 3 negocios'],
+            ['id_plan' => '2', 'titulo' => 'maximonegocios', 'valor' => '3'],
+            ['id_plan' => '2', 'titulo' => 'limite_citas_mes', 'valor' => '500'],
+            ['id_plan' => '2', 'titulo' => 'limite_servicios_negocios', 'valor' => '15'],
+            ['id_plan' => '2', 'titulo' => 'intervalo_citas_minutos', 'valor' => '5'],
+            ['id_plan' => '2', 'titulo' => 'recordatorio_minutos', 'valor' => '180'],
+            ['id_plan' => '2', 'titulo' => 'permite_anticipo', 'valor' => '1'],
+            ['id_plan' => '2', 'titulo' => 'permite_reembolso', 'valor' => '0'],
+            ['id_plan' => '2', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '200'],
+            ['id_plan' => '2', 'titulo' => 'limite_telefonos_negocios', 'valor' => '5'],
+            ['id_plan' => '2', 'titulo' => 'anticipo_forzoso', 'valor' => '25'],
 
-            [
-                'id_plan' => '3',
-                'titulo' => 'precio',
-                'valor' => '500',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'descripcion',
-                'valor' => 'El Avanzado, puedes crear hasta 6 negocios y URL personalizado',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'maximonegocios',
-                'valor' => '6',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'limite_citas_mes',
-                'valor' => null,
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'limite_servicios',
-                'valor' => null,
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'intervalo_citas_minutos',
-                'valor' => '1',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'recordatorio_minutos',
-                'valor' => '10',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'permite_anticipo',
-                'valor' => '1',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'permite_reembolso',
-                'valor' => '1',
-            ],
-            [
-                'id_plan' => '3',
-                'titulo' => 'whatsapp_creditos_iniciales',
-                'valor' => '500',
-            ],
+            // --- PLAN AVANZADO (3) ---
+            ['id_plan' => '3', 'titulo' => 'precio', 'valor' => '500'],
+            ['id_plan' => '3', 'titulo' => 'descripcion', 'valor' => 'El Avanzado, puedes crear hasta 6 negocios y URL personalizado'],
+            ['id_plan' => '3', 'titulo' => 'maximonegocios', 'valor' => '6'],
+            ['id_plan' => '3', 'titulo' => 'limite_citas_mes', 'valor' => null],
+            ['id_plan' => '3', 'titulo' => 'limite_servicios_negocios', 'valor' => null],
+            ['id_plan' => '3', 'titulo' => 'intervalo_citas_minutos', 'valor' => '1'],
+            ['id_plan' => '3', 'titulo' => 'recordatorio_minutos', 'valor' => '10'],
+            ['id_plan' => '3', 'titulo' => 'permite_anticipo', 'valor' => '1'],
+            ['id_plan' => '3', 'titulo' => 'permite_reembolso', 'valor' => '1'],
+            ['id_plan' => '3', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '500'],
+            ['id_plan' => '3', 'titulo' => 'limite_telefonos_negocios', 'valor' => '10'],
+            ['id_plan' => '3', 'titulo' => 'anticipo_forzoso', 'valor' => '10'],
         ]);
-
     }
 
     /**

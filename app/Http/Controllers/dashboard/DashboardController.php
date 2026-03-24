@@ -18,33 +18,28 @@ class DashboardController extends Controller
 
         Log::info('entro Dashboard ' . $idUsuario);
 
-        // 1. se anade 'name' a la consulta para que Vue lo pueda mostrar
         $usuarioLoggeado = DB::select("SELECT id_plan, email, name FROM users WHERE id = " . $idUsuario);
 
-        // Contamos los negocios del usuario
         $cantidadNegocios = DB::table('negocios')->where('id_usuario', $idUsuario)->count();
         if($usuarioLoggeado != null){
             if($usuarioLoggeado[0]->id_plan != null){
-                // Buscamos los datos del plan (Créditos, Nombre, etc)
                 $globalFuncion = new GlobalFuncion();
                 $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado[0]->id_plan);
-
                 $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
 
                 return response()->json([
                     'valid' => true,
-                    // 2. se anade [0] para enviar el objeto limpio a Vue, no un arreglo
                     'planAdquirido' => $planAdquirido,
                     'usuarioLoggeado' => $usuarioLoggeado[0],
-                    'cantidadNegocios' => $cantidadNegocios, // 👇 LO ENVIAMOS A VUE
+                    'cantidadNegocios' => $cantidadNegocios,
                     'prioridadesTicket' => $prioridadesTicket
                 ]);
             }else{
                 return response()->json([
                     'valid' => true,
                     'planAdquirido' => null,
-                    'usuarioLoggeado' => $usuarioLoggeado[0], // También aquí
-                    'cantidadNegocios' => $cantidadNegocios // 👇 LO ENVIAMOS A VUE
+                    'usuarioLoggeado' => $usuarioLoggeado[0],
+                    'cantidadNegocios' => $cantidadNegocios
                 ]);
             }
         }
@@ -56,17 +51,14 @@ class DashboardController extends Controller
     }
 
     public function registrarPlanNegocio(Request $request){
-
         try {
             $planNegocio = DB::table('planes')->where('id', $request->plan)->first();
 
             if($planNegocio != null){
-                //TRAER CARACTERISTICAS DEL PLAN
                 $globalFuncion = new GlobalFuncion();
                 $caracteristicasPlan = $globalFuncion->obtenerPlanCompleto($planNegocio->id);
 
                 $maxPermitido = $caracteristicasPlan->maximonegocios ?? 1;
-
                 $cantidadActual = DB::table('negocios')->where('id_usuario', Auth::id())->count();
 
                 if ($cantidadActual >= $maxPermitido) {
@@ -76,16 +68,13 @@ class DashboardController extends Controller
                     ]);
                 }
 
-                // 1. Armamos el slug (usamos el personalizado, y si está vacío usamos el nombre)
                 $slugBase = $request->slug ? Str::slug($request->slug) : Str::slug($request->nombre);
                 $slug = 'www.agendavb/' . $slugBase . '.com';
 
-                // Si es Básico o Medio, sobreescribimos con un UUID aleatorio
                 if($planNegocio->id != 3){
                     $slug = 'www.agendavb/' . Str::uuid() . '.com';
                 }
 
-                // 2. CANDADO DE URL: Revisamos si esa URL ya está ocupada
                 $existeSlug = DB::table('negocios')->where('slug', $slug)->exists();
                 if ($existeSlug && $planNegocio->id == 3) {
                     return response()->json([
@@ -94,31 +83,45 @@ class DashboardController extends Controller
                     ]);
                 }
 
-                // 3. Inserción normal
+                // 1. INSERCIÓN DEL NEGOCIO (SIN TELÉFONO)
                 $idNegocio = DB::table('negocios')->insertGetId([
                     'id_usuario' => $request->user()->id,
                     'id_plan' => $request->plan,
                     'nombre' => $request->nombre,
-                    'slug' => $slug, // Se guarda nuestro nuevo slug validado
+                    'slug' => $slug,
                     'email' => $request->email,
-                    'telefono' => $request->telefono ?? '0000000000',
-                    'whatsapp_creditos' => $caracteristicasPlan->whatsapp_creditos_iniciales?? 0,
-                    'hora_inicio' => $request->hora_inicio,
-                    'hora_fin' => $request->hora_fin,
+                    'whatsapp_creditos' => $caracteristicasPlan->whatsapp_creditos_iniciales ?? 0,
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now()
                 ]);
 
+                // 2. INSERCIÓN DE MÚLTIPLES TELÉFONOS
+                if ($request->has('telefonos') && is_array($request->telefonos)) {
+                    $telefonosInsert = [];
+                    foreach ($request->telefonos as $tel) {
+                        if (!empty($tel['numero'])) {
+                            $telefonosInsert[] = [
+                                'id_negocio' => $idNegocio,
+                                'id_tipo_numero_telefono' => $tel['id_tipo'],
+                                'numero_telefono' => $tel['numero'],
+                                'created_at' => Carbon::now(),
+                                'updated_at' => Carbon::now()
+                            ];
+                        }
+                    }
+                    if (count($telefonosInsert) > 0) {
+                        DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
+                    }
+                }
+
+                // 3. INSERCIÓN DE HORARIOS
                 foreach($request->horarios as $horario){
-
                     $horas = explode(' - ', $horario);
-
                     DB::table('horarios_negocios')->insert([
                         'id_negocio' => $idNegocio,
                         'hora_inicio' => $horas[0],
                         'hora_fin' => $horas[1],
                     ]);
-
                 }
 
                 DB::table('users')->where('id', Auth::id())->update([
@@ -144,28 +147,32 @@ class DashboardController extends Controller
         }
     }
 
-    //NUEVAS FUNCIONES PARA EL MÓDULO DE NEGOCIOS
     public function misNegocios(Request $request){
         $idUsuario = Auth::id();
 
-        //Obtenemos datos del usuario y su plan
         $usuarioLoggeado = DB::table('users')->select('name', 'email', 'id_plan')->where('id', $idUsuario)->first();
         $planAdquirido = DB::table('planes')->where('id', $usuarioLoggeado->id_plan)->first();
-
-        //Traemos TODOS los negocios que le pertenecen a este usuario
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
-        //inserta los horarios a cada negocio antes de enviarlos a Vue
         foreach ($negocios as $negocio) {
+            // Adjuntar Horarios
             $horariosDB = DB::table('horarios_negocios')->where('id_negocio', $negocio->id)->get();
             $horariosArray = [];
-
             foreach ($horariosDB as $horario) {
-                // Arma el string exacto que Vue necesita ("08:00 - 09:00")
                 $horariosArray[] = $horario->hora_inicio . ' - ' . $horario->hora_fin;
             }
-
             $negocio->horarios = $horariosArray;
+
+            // Adjuntar Teléfonos
+            $telefonosDB = DB::table('numeros_telefonos_negocio')->where('id_negocio', $negocio->id)->get();
+            $telefonosArray = [];
+            foreach ($telefonosDB as $tel) {
+                $telefonosArray[] = [
+                    'id_tipo' => $tel->id_tipo_numero_telefono,
+                    'numero' => $tel->numero_telefono
+                ];
+            }
+            $negocio->telefonos = $telefonosArray;
         }
 
         return response()->json([
@@ -178,7 +185,6 @@ class DashboardController extends Controller
 
     public function actualizarNegocio(Request $request, $id){
         try {
-            // Seguridad: Aseguramos que el usuario solo edite SU propio negocio
             $negocioMio = DB::table('negocios')
                 ->where('id', $id)
                 ->where('id_usuario', Auth::id())
@@ -191,24 +197,39 @@ class DashboardController extends Controller
                 ]);
             }
 
-            // Actualizamos los datos básicos
+            // Actualizamos datos básicos (ya sin teléfono)
             DB::table('negocios')
                 ->where('id', $id)
                 ->update([
                     'nombre' => $request->nombre,
-                    'telefono' => $request->telefono,
                     'updated_at' => Carbon::now()
                 ]);
 
-            //ACTUALIZAMOS LOS HORARIOS
-            // 1. Borramos todos los horarios viejos de este negocio
-            DB::table('horarios_negocios')->where('id_negocio', $id)->delete();
+            // ACTUALIZAMOS TELÉFONOS
+            DB::table('numeros_telefonos_negocio')->where('id_negocio', $id)->delete();
+            if ($request->has('telefonos') && is_array($request->telefonos)) {
+                $telefonosInsert = [];
+                foreach($request->telefonos as $tel){
+                    if (!empty($tel['numero'])) {
+                        $telefonosInsert[] = [
+                            'id_negocio' => $id,
+                            'id_tipo_numero_telefono' => $tel['id_tipo'],
+                            'numero_telefono' => $tel['numero'],
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
+                    }
+                }
+                if (count($telefonosInsert) > 0) {
+                    DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
+                }
+            }
 
-            // 2. Insertamos los nuevos que mandó Vue
+            // ACTUALIZAMOS HORARIOS
+            DB::table('horarios_negocios')->where('id_negocio', $id)->delete();
             if ($request->has('horarios') && is_array($request->horarios)) {
                 foreach($request->horarios as $horario){
-                    $horas = explode(' - ', $horario); // Partimos "08:00 - 09:00" en dos
-
+                    $horas = explode(' - ', $horario);
                     if (count($horas) == 2) {
                         DB::table('horarios_negocios')->insert([
                             'id_negocio' => $id,

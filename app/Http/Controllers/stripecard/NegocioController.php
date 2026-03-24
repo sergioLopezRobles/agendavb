@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Stripe\Stripe;
-use Stripe\PaymentIntent;
+use Stripe\Customer;
+use Stripe\Subscription;
 use Illuminate\Support\Str;
 
 class NegocioController extends Controller
@@ -16,63 +17,104 @@ class NegocioController extends Controller
     public function registrarPlanNegocio(Request $request)
     {
         try {
-            // 1. CONFIGURAR STRIPE (LLAVE SECRETA DE PRUEBA)
-            // Reemplaza esto con tu llave real de Stripe que empieza con sk_test_...
-            Stripe::setApiKey( config('services.stripe.secret'));
+            // ======================================================
+            // 1. LÓGICA DE STRIPE (SUSCRIPCIONES RECURRENTES) ENCENDIDA
+            // ======================================================
+            // COMENTA DESDE AQUÍ
 
-            // 2. DEFINIR LOS PRECIOS SEGÚN EL PLAN
-            // Stripe cobra en centavos. Si quieres cobrar $200.00 MXN, debes mandarle 20000.
-            $precios = [
-                1 => 10000, // Plan 1: $200.00 MXN
-                2 => 20000, // Plan 2: $400.00 MXN
-                3 => 50000  // Plan 3: $600.00 MXN
+            Stripe::setApiKey(config('services.stripe.secret'));
+
+            // a) Mapear los planes a los IDs de Precio de Stripe
+            $preciosStripe = [
+                1 => 'price_1T8vySCPQ2Qy65AdXblJIcCw', // Básico
+                2 => 'price_1T8vyrCPQ2Qy65AdxgyLrYm3', // Medio
+                3 => 'price_1T8vz5CPQ2Qy65AdLIyKXr8M'  // Avanzado
             ];
 
-            $montoACobrar = $precios[$request->plan] ?? 20000; // Por defecto cobra el plan 1 si hay error
+            $priceId = $preciosStripe[$request->plan] ?? 'price_1T8vySCPQ2Qy65AdXblJIcCw';
 
-            // 3. EJECUTAR EL COBRO EN STRIPE
-            // Usamos el "payment_method_id" que nos mandó Vue desde el front-end
-            $paymentIntent = PaymentIntent::create([
-                'amount' => $montoACobrar,
-                'currency' => 'mxn',
+            // b) Crear el Cliente en Stripe y asignarle la tarjeta
+            $customer = Customer::create([
+                'name' => $request->nombre,
+                'email' => $request->email,
                 'payment_method' => $request->payment_method_id,
-                'confirmation_method' => 'manual',
-                'confirm' => true,
-                'return_url' => 'http://localhost:8000/dashboard' // Requerido por Stripe
+                'invoice_settings' => [
+                    'default_payment_method' => $request->payment_method_id,
+                ],
             ]);
 
-            // ==========================================================
-            // 4. SI EL CÓDIGO LLEGA HASTA AQUÍ, EL PAGO FUE APROBADO ✅
-            // ==========================================================
-            // --> ESTA ES LA LÍNEA NUEVA QUE FALTA: ACTUALIZAR AL USUARIO
+            // c) Crear la Suscripción recurrente
+            $subscription = Subscription::create([
+                'customer' => $customer->id,
+                'items' => [
+                    ['price' => $priceId],
+                ],
+                'expand' => ['latest_invoice.payment_intent'],
+            ]);
+
+            // d) GUARDAR LA SUSCRIPCIÓN EN TU BASE DE DATOS
+            DB::table('suscripciones_stripe')->insert([
+                'id_usuario' => Auth::id(),
+                'nombre' => 'Plan ' . $request->plan,
+                'stripe_id' => $subscription->id,
+                'stripe_status' => $subscription->status,
+                'stripe_price' => $priceId,
+                'quantity' => 1,
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now()
+            ]);
+            //HASTA AQUÍ
+
+            // ======================================================
+            // 2. GUARDAR EL NEGOCIO EN TU BASE DE DATOS
+            // ======================================================
+
+            // ACTUALIZAR AL USUARIO
             DB::table('users')
                 ->where('id', Auth::id())
                 ->update(['id_plan' => $request->plan]);
 
-            // GENERAR SLUG CORTO AUTOMÁTICO SI VIENE VACÍO
+            // GENERAR SLUG
             $slugFinal = $request->slug;
             if (empty($slugFinal)) {
                 $slugBase = \Illuminate\Support\Str::slug(substr($request->nombre, 0, 12));
                 $slugFinal = $slugBase . '-' . strtolower(\Illuminate\Support\Str::random(4));
             }
 
-            // INSERTAR EL NEGOCIO (AQUÍ ESTÁ LA CORRECCIÓN CLAVE)
+            // INSERTAR EL NEGOCIO
             $idNegocio = DB::table('negocios')->insertGetId([
                 'id_usuario' => Auth::id(),
                 'id_plan' => $request->plan,
                 'nombre' => $request->nombre,
-                'telefono' => $request->telefono,
                 'email' => $request->email,
-                'slug' => $slugFinal, // <--- DEBE DECIR EXACTAMENTE ESTO, SIN EL $request->slug
+                'slug' => $slugFinal,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
             ]);
 
-            // Insertar los horarios seleccionados
+            // INSERTAR TELÉFONOS
+            if ($request->has('telefonos') && is_array($request->telefonos)) {
+                $telefonosInsert = [];
+                foreach ($request->telefonos as $tel) {
+                    if (!empty($tel['numero'])) {
+                        $telefonosInsert[] = [
+                            'id_negocio' => $idNegocio,
+                            'id_tipo_numero_telefono' => $tel['id_tipo'],
+                            'numero_telefono' => $tel['numero'],
+                            'created_at' => Carbon::now(),
+                            'updated_at' => Carbon::now()
+                        ];
+                    }
+                }
+                if (count($telefonosInsert) > 0) {
+                    DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
+                }
+            }
+
+            // INSERTAR HORARIOS
             if ($request->has('horarios') && is_array($request->horarios)) {
                 $horariosInsert = [];
                 foreach ($request->horarios as $horario) {
-                    // Separar "09:00 - 10:00" en inicio y fin
                     $partes = explode(' - ', $horario);
                     if (count($partes) == 2) {
                         $horariosInsert[] = [
@@ -84,7 +126,6 @@ class NegocioController extends Controller
                         ];
                     }
                 }
-
                 if (count($horariosInsert) > 0) {
                     DB::table('horarios_negocios')->insert($horariosInsert);
                 }
@@ -92,17 +133,15 @@ class NegocioController extends Controller
 
             return response()->json([
                 'valid' => true,
-                'message' => '¡Pago aprobado! Negocio registrado con éxito.'
+                'message' => '¡Suscripción aprobada y registrada!'
             ]);
 
         } catch (\Stripe\Exception\CardException $e) {
-            // SI LA TARJETA ES RECHAZADA (Fondos insuficientes, robada, etc.)
             return response()->json([
                 'valid' => false,
                 'message' => 'El pago fue rechazado: ' . $e->getError()->message
             ]);
         } catch (\Exception $e) {
-            // CUALQUIER OTRO ERROR DE SISTEMA
             return response()->json([
                 'valid' => false,
                 'message' => 'Error al procesar: ' . $e->getMessage()

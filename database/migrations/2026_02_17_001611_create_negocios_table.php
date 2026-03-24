@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('id_plan');    // Plan que eligió (LA QUE FALTABA)
             $table->string('nombre');
             $table->string('slug')->unique();
-            $table->string('telefono');
             $table->string('email');
             $table->string('whatsapp_creditos')->default('0');
             $table->string('hora_inicio')->nullable();

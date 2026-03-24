@@ -1,6 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { loadStripe } from '@stripe/stripe-js';
 
 const emit = defineEmits(['planRegistrado']);
@@ -16,18 +16,16 @@ const props = defineProps({
 
 const mostrarModal = ref(false)
 
-const codigoEnviado = ref(true)
-const numeroVerificado = ref(true)
-
 const formulario = reactive({
     nombre: '',
-    telefono: '',
     email: '',
-    slug: ''
+    slug: '',
+    telefonos: [{ id_tipo: 1, numero: '' }]
 })
 
 const errores = reactive({})
 
+// RECUERDA: Esta es tu llave PÚBLICA de prueba
 const stripePromise = loadStripe('pk_test_51T8vO4CPQ2Qy65AdX1JGvoLFng7dtqBIWCaWAbVENn8JNGyQbYmC6hfFjdStUT2AAdRUOyLz6E35IqdlkWfglDQ5009NWtv54j');
 let stripe = null;
 let cardElement = null;
@@ -44,7 +42,25 @@ const horariosDisponibles = [
 
 const horarios = ref([])
 
-// --> funcion para agregar o quitar horario
+const limiteTelefonos = computed(() => {
+    const limite = props.plan?.caracteristicas?.limite_telefonos_negocios;
+    return limite ? parseInt(limite) : 3;
+});
+
+const agregarTelefono = () => {
+    if (formulario.telefonos.length < limiteTelefonos.value) {
+        formulario.telefonos.push({ id_tipo: 1, numero: '' });
+    } else {
+        window.$toast.show(`Tu plan permite un máximo de ${limiteTelefonos.value} teléfonos.`, 'warning', 3000);
+    }
+};
+
+const quitarTelefono = (index) => {
+    if (formulario.telefonos.length > 1) {
+        formulario.telefonos.splice(index, 1);
+    }
+};
+
 function toggleHorario(hora) {
     const index = horarios.value.indexOf(hora)
     if (index === -1) {
@@ -53,7 +69,6 @@ function toggleHorario(hora) {
     } else {
         horarios.value.splice(index, 1)
     }
-
     if(errores.horarios) delete errores.horarios
 }
 
@@ -75,134 +90,130 @@ const abrirModal = () => {
     mostrarModal.value = true;
     errorTarjeta.value = '';
 
-    setTimeout(async () => {
-        stripe = await stripePromise;
-        const elements = stripe.elements();
+    // STRIPE COMENTAR
 
-        cardElement = elements.create('card', {
-            style: {
-                base: {
-                    fontSize: '16px',
-                    color: '#32325d',
-                    fontFamily: '"Helvetica Neue", Helvetica, sans-serif','::placeholder': { color: '#aab7c4' },
-                },
-                invalid: { color: '#fa755a', iconColor: '#fa755a' }
-            }
-        });
+setTimeout(async () => {
+    stripe = await stripePromise;
+    const elements = stripe.elements();
 
-        cardElement.mount('#card-element');
+    cardElement = elements.create('card', {
+        style: {
+            base: {
+                fontSize: '16px',
+                color: '#32325d',
+                fontFamily: '"Helvetica Neue", Helvetica, sans-serif','::placeholder': { color: '#aab7c4' },
+            },
+            invalid: { color: '#fa755a', iconColor: '#fa755a' }
+        }
+    });
 
-        cardElement.on('change', (event) => {
-            errorTarjeta.value = event.error ? event.error.message : '';
-        });
-    }, 200);
+    cardElement.mount('#card-element');
+
+    cardElement.on('change', (event) => {
+        errorTarjeta.value = event.error ? event.error.message : '';
+    });
+}, 200);
+
+
 }
 
 const cerrarModal = () => {
-    mostrarModal.value = false
-    limpiarFormulario()
+mostrarModal.value = false
+limpiarFormulario()
 }
 
 const limpiarFormulario = () => {
-    formulario.nombre = ''
-    formulario.telefono = ''
-    formulario.slug = ''
-    horarios.value = []
-    codigoEnviado.value = false
-    numeroVerificado.value = false
-    Object.keys(errores).forEach(key => delete errores[key])
+formulario.nombre = ''
+formulario.slug = ''
+formulario.telefonos = [{ id_tipo: 1, numero: '' }]
+horarios.value = []
+Object.keys(errores).forEach(key => delete errores[key])
 }
 
 const validarFormulario = () => {
-    Object.keys(errores).forEach(key => delete errores[key])
-    let esValido = true
+Object.keys(errores).forEach(key => delete errores[key])
+let esValido = true
 
-    if (!formulario.nombre.trim()) {
-        errores.nombre = 'El nombre del negocio es obligatorio.'
-        esValido = false
+if (!formulario.nombre.trim()) {
+    errores.nombre = 'El nombre del negocio es obligatorio.'
+    esValido = false
+}
+
+formulario.telefonos.forEach((tel, index) => {
+    if (!tel.numero.trim() || tel.numero.length < 10) {
+        errores[`telefono_${index}`] = 'El número debe tener 10 dígitos.';
+        esValido = false;
     }
+});
 
-    if (!formulario.telefono.trim() || formulario.telefono.length !== 10) {
-        errores.telefono = 'Debe contener exactamente 10 dígitos numéricos.'
-        esValido = false
-    }
+if (horarios.value.length === 0) {
+    errores.horarios = 'Debes agregar al menos un horario de atención.'
+    esValido = false
+}
 
-    if (horarios.value.length === 0) {
-        errores.horarios = 'Debes agregar al menos un horario de atención.'
-        esValido = false
-    }
-
-    return esValido
+return esValido
 }
 
 const formRegistrarPlanNegocio = async () => {
-    if (!validarFormulario()) return
+if (!validarFormulario()) return
 
-    try {
-        // 1. Pedirle a Stripe que procese la tarjeta antes de guardar en tu BD
-        const { paymentMethod, error } = await stripe.createPaymentMethod({
-            type: 'card',
-            card: cardElement,
-            billing_details: {
-                name: formulario.nombre,
-                email: formulario.email,
-            },
-        });
+try {
+    // STRIPE ENCENDIDO COMENTAR
 
-        // Si la tarjeta falla (fondos insuficientes, numero mal, etc), detenemos todo
-        if (error) {
-            errorTarjeta.value = error.message;
-            return;
-        }
+const { paymentMethod, error } = await stripe.createPaymentMethod({
+    type: 'card',
+    card: cardElement,
+    billing_details: {
+        name: formulario.nombre,
+        email: formulario.email,
+    },
+});
 
-        // 2. Si la tarjeta pasa, mandamos los datos y el token de Stripe a Laravel
-        const response = await fetch('/api/registrar-plan-negocio',{
-            method: 'POST',
-            headers: {
-                'Content-Type' : 'application/json',
-                'Authorization': `Bearer ${token.value}`
-            },
-            body: JSON.stringify({
-                plan: props.plan.id,
-                nombre: formulario.nombre,
-                email: formulario.email,
-                telefono: formulario.telefono,
-                slug: formulario.slug,
-                horarios: horarios.value,
-                payment_method_id: paymentMethod.id // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE
-            })
-        })
+if (error) {
+    errorTarjeta.value = error.message;
+    return;
+}
 
-        const data = await response.json()
 
-        if(data.valid){
-            window.$toast.show('¡Pago exitoso y negocio registrado!', 'success', 5000)
-            cerrarModal()
+const response = await fetch('/api/registrar-plan-negocio',{
+    method: 'POST',
+    headers: {
+        'Content-Type' : 'application/json',
+        'Authorization': `Bearer ${token.value}`
+    },
+    body: JSON.stringify({
+        plan: props.plan.id,
+        nombre: formulario.nombre,
+        email: formulario.email,
+        telefonos: formulario.telefonos,
+        slug: formulario.slug,
+        horarios: horarios.value,
+        payment_method_id: paymentMethod.id // <-- MANDAMOS EL TOKEN REAL DE LA TARJETA
+    })
+})
 
-            // 1. DESBLOQUEA LOS MÓDULOS DEL MENÚ LATERAL
-            localStorage.setItem('userHasPlan', 'true')
+const data = await response.json()
 
-            // 2. REDIRIGE AL DASHBOARD Y REFRESCAMOS PARA OBTENER LOS DATOS NUEVOS
-            window.location.href = '/dashboard'
-        }else{
-            window.$toast.show(data.message, 'warning', 5000)
-        }
-    } catch (error) {
-        console.error("Error en la petición:", error)
-        window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
-    }
+if(data.valid){
+    window.$toast.show('¡Suscripción exitosa y negocio registrado!', 'success', 5000)
+    cerrarModal()
+    localStorage.setItem('userHasPlan', 'true')
+    window.location.href = '/dashboard'
+}else{
+    window.$toast.show(data.message, 'warning', 5000)
+}
+} catch (error) {
+console.error("Error en la petición:", error)
+window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
+}
 }
 </script>
 
 <template>
     <div class="col-md-6 col-lg-4 mb-4">
-
         <div class="card saas-card h-100 border-0 shadow-sm rounded-3 position-relative bg-white overflow-hidden">
-
             <div class="position-absolute top-0 start-0 w-100 bg-primary" style="height: 4px;"></div>
-
             <div class="card-body p-4 p-md-5 d-flex flex-column">
-
                 <div class="mb-4">
                     <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold text-uppercase mb-3 tracking-wide" style="letter-spacing: 0.5px;">
                         {{ plan.nombre }}
@@ -213,9 +224,7 @@ const formRegistrarPlanNegocio = async () => {
                     </h2>
                     <p class="text-secondary mb-0" style="font-size: 0.95rem;">{{ plan.caracteristicas?.descripcion }}</p>
                 </div>
-
                 <hr class="text-muted opacity-10 mb-4">
-
                 <ul class="list-unstyled mb-4 flex-grow-1">
                     <li class="mb-3 d-flex align-items-start">
                         <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3 mt-1 flex-shrink-0" style="width: 24px; height: 24px;">
@@ -245,33 +254,26 @@ const formRegistrarPlanNegocio = async () => {
                         </div>
                     </li>
                 </ul>
-
             </div>
-
             <div class="card-footer bg-transparent border-0 p-4 pt-0">
                 <button v-if="currentPlanId == plan.id" class="btn btn-light text-muted w-100 py-3 fw-bold fs-6 rounded-pill border" disabled>
                     Plan actual activado
                 </button>
-
-                <button v-else-if="currentPlanId != null" @click="eventPlanSeleccionado" class="btn btn-outline-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn">
+                <button v-else-if="currentPlanId != null" @click="" class="btn btn-outline-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn">
                     Cambiar a este plan
                 </button>
-
                 <button v-else-if="token && planGuardado" @click="abrirModal" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn shadow-sm">
                     Registrar Negocio
                 </button>
-
                 <button v-else @click="eventPlanSeleccionado" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-pill saas-btn shadow-sm">
                     Comenzar ahora
                 </button>
             </div>
-
         </div>
 
         <div v-if="mostrarModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-
                     <div class="modal-header border-bottom-0 pb-0 px-4 pt-4 px-md-5 pt-md-5">
                         <div>
                             <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-2">Paso final</span>
@@ -281,7 +283,6 @@ const formRegistrarPlanNegocio = async () => {
                     </div>
 
                     <div class="modal-body px-4 py-4 px-md-5">
-
                         <div class="d-flex justify-content-between align-items-center p-4 rounded-4 mb-4 border" style="background-color: #f8f9fa;">
                             <div>
                                 <p class="text-muted small fw-bold mb-1 text-uppercase">Resumen de compra</p>
@@ -293,59 +294,43 @@ const formRegistrarPlanNegocio = async () => {
                         </div>
 
                         <form @submit.prevent="formRegistrarPlanNegocio">
-
-                            <div class="mb-4">
-                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Nombre de tu negocio</label>
-                                <input
-                                    type="text"
-                                    v-model="formulario.nombre"
-                                    class="form-control form-control-lg bg-light border-0 px-4"
-                                    style="border-radius: 0.75rem;"
-                                    :class="{ 'is-invalid': errores.nombre }"
-                                    placeholder="Ej. Clínica Dental Vista Boreal"
-                                >
-                                <div class="invalid-feedback fw-medium px-2">{{ errores.nombre }}</div>
-                            </div>
-
                             <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Nombre de tu negocio</label>
+                                    <input type="text" v-model="formulario.nombre" class="form-control form-control-lg bg-light border-0 px-4" style="border-radius: 0.75rem;" :class="{ 'is-invalid': errores.nombre }" placeholder="Ej. Clínica Dental Vista Boreal">
+                                    <div class="invalid-feedback fw-medium px-2">{{ errores.nombre }}</div>
+                                </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Correo del titular</label>
                                     <input type="email" v-model="formulario.email" class="form-control form-control-lg text-muted px-4 border-0" style="background-color: #e9ecef; border-radius: 0.75rem;" disabled>
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">WhatsApp de contacto</label>
-                                    <input
-                                        type="tel"
-                                        v-model="formulario.telefono"
-                                        class="form-control form-control-lg bg-light border-0 px-4"
-                                        style="border-radius: 0.75rem;"
-                                        :class="{ 'is-invalid': errores.telefono }"
-                                        placeholder="10 dígitos"
-                                        maxlength="10"
-                                        @input="formulario.telefono = formulario.telefono.replace(/\D/g, '')"
-                                    >
-                                    <div class="invalid-feedback fw-medium px-2" v-if="errores.telefono">{{ errores.telefono }}</div>
+                            </div>
+
+                            <div class="mb-4 pt-2">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-0">Teléfonos de Contacto (Máx. {{ limiteTelefonos }})</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" @click="agregarTelefono" v-if="formulario.telefonos.length < limiteTelefonos">+ Agregar otro</button>
+                                </div>
+                                <div v-for="(tel, index) in formulario.telefonos" :key="index" class="d-flex gap-2 mb-3 align-items-start">
+                                    <select v-model="tel.id_tipo" class="form-select bg-light border-0" style="width: 140px; border-radius: 0.75rem;">
+                                        <option :value="1">WhatsApp</option>
+                                        <option :value="2">Fijo</option>
+                                        <option :value="3">Telegram</option>
+                                    </select>
+                                    <div class="flex-grow-1">
+                                        <input type="tel" v-model="tel.numero" class="form-control bg-light border-0 px-3" :class="{ 'is-invalid': errores['telefono_' + index] }" placeholder="10 dígitos" maxlength="10" @input="tel.numero = tel.numero.replace(/\D/g, '')" style="border-radius: 0.75rem;">
+                                        <div class="invalid-feedback fw-medium px-2" v-if="errores['telefono_' + index]">{{ errores['telefono_' + index] }}</div>
+                                    </div>
+                                    <button type="button" class="btn btn-light text-danger border-0 rounded-circle" @click="quitarTelefono(index)" v-if="formulario.telefonos.length > 1">❌</button>
                                 </div>
                             </div>
 
                             <div class="mb-4 pt-2">
-                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">
-                                    Disponibilidad de horarios
-                                    <span class="text-muted fw-normal text-capitalize ms-2">(Selecciona los bloques de atención)</span>
-                                </label>
-
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">Disponibilidad de horarios</label>
                                 <div class="border rounded-4 p-4 bg-white shadow-sm" :class="{'border-danger': errores.horarios}">
                                     <div class="d-flex flex-wrap gap-2" style="max-height: 180px; overflow-y: auto;">
-                                        <button
-                                            v-for="hora in horariosDisponibles"
-                                            :key="hora"
-                                            type="button"
-                                            class="btn btn-sm rounded-pill fw-medium transition-all px-3 py-2 border"
-                                            :class="horarios.includes(hora) ? 'btn-primary border-primary shadow-sm text-white' : 'btn-light border-light text-secondary'"
-                                            @click="toggleHorario(hora)"
-                                        >
-                                            <span v-if="horarios.includes(hora)" class="me-1">✓</span>
-                                            {{ hora }}
+                                        <button v-for="hora in horariosDisponibles" :key="hora" type="button" class="btn btn-sm rounded-pill fw-medium transition-all px-3 py-2 border" :class="horarios.includes(hora) ? 'btn-primary border-primary shadow-sm text-white' : 'btn-light border-light text-secondary'" @click="toggleHorario(hora)">
+                                            <span v-if="horarios.includes(hora)" class="me-1">✓</span>{{ hora }}
                                         </button>
                                     </div>
                                 </div>
@@ -358,7 +343,6 @@ const formRegistrarPlanNegocio = async () => {
                                     <span class="input-group-text bg-light border-0 text-muted px-4">www.agendavb/</span>
                                     <input type="text" v-model="formulario.slug" class="form-control border-0 bg-light" placeholder="tu-marca-aqui" required>
                                 </div>
-                                <small class="text-muted d-block mt-2 px-2">Este será el link público para tus clientes.</small>
                             </div>
 
                             <div class="mb-4 pt-2 border-top">
@@ -374,7 +358,7 @@ const formRegistrarPlanNegocio = async () => {
                             </div>
 
                             <div class="mt-5 d-flex justify-content-end gap-2">
-                                <button type="submit" class="btn btn-primary px-5 py-3 fw-bold rounded-pill shadow-sm saas-btn">Confirmar y guardar</button>
+                                <button type="submit" class="btn btn-primary px-5 py-3 fw-bold rounded-pill shadow-sm saas-btn">Confirmar y suscribirme</button>
                             </div>
 
                         </form>
@@ -386,36 +370,13 @@ const formRegistrarPlanNegocio = async () => {
 </template>
 
 <style scoped>
-/* --> animaciones y sombras limpias saas */
-.saas-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-.saas-card:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 1rem 3rem rgba(0,0,0,0.1) !important;
-}
-.saas-btn {
-    transition: all 0.2s ease-in-out;
-}
-.saas-btn:hover {
-    transform: scale(1.02);
-}
-.tracking-wide {
-    letter-spacing: 0.05em;
-}
-/* --> personalizar la barra de scroll para los horarios */
-::-webkit-scrollbar {
-    width: 6px;
-}
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
+.saas-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.saas-card:hover { transform: translateY(-6px); box-shadow: 0 1rem 3rem rgba(0,0,0,0.1) !important; }
+.saas-btn { transition: all 0.2s ease-in-out; }
+.saas-btn:hover { transform: scale(1.02); }
+.tracking-wide { letter-spacing: 0.05em; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 </style>
