@@ -77,7 +77,7 @@ const logout = async () => {
                 </li>
 
                 <li v-if="tienePlan" class="nav-item">
-                    <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
+                    <a href="/citas-negocios" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
                         <span class="fs-3 me-3">📆</span>
                         <span class="menu-text fw-medium">Agenda Digital</span>
                     </a>

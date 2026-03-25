@@ -8,6 +8,7 @@ import PlanCard from "./componentes/PlanCard.vue";
 import Negocios from "./pages/Negocios.vue";
 import TicketsSoporte from "./pages/TicketsSoporte.vue";
 import CitasClientes from "./pages/CitasClientes.vue";
+import CitasNegocios from "./pages/CitasNegocios.vue";
 
 const routes = [
     {
@@ -47,6 +48,11 @@ const routes = [
         component: CitasClientes,
         //NO SE LE AGREGA meta: { requiresAuth: true }, PARA QUE LA RUTA PUEDA SER PUBLICA
     },
+    {
+        path: '/citas-negocios',
+        component: CitasNegocios,
+        meta: { requiresAuth: true }
+    }
 ]
 
 const router = createRouter({

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\api\AuthController;
 use App\Http\Controllers\api\TwilioController;
+use App\Http\Controllers\citasnegocios\CitasNegociosController;
 use App\Http\Controllers\clientes\CitasClientesController;
 use App\Http\Controllers\dashboard\DashboardController;
 use App\Http\Controllers\plan\PlanController;
@@ -35,7 +36,6 @@ Route::get('/citasclientes/{slug}',[CitasClientesController::class,'citascliente
 Route::post('/registrar-cita-cliente',[CitasClientesController::class,'registrarcitacliente']);
 Route::post('/horarios-disponibles',[CitasClientesController::class,'horariosdisponibles']);
 
-
 // RUTAS PRIVADAS (Requieren sesión iniciada)
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
@@ -61,4 +61,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     //RUTA STRIPE PARA PAGAR PLAN
     Route::post('/registrar-plan-negocio', [NegocioController::class, 'registrarPlanNegocio']);
+
+    // RUTAS CITASNEGOCIO
+    Route::get('/citas-negocios', [CitasNegociosController::class, 'citasnegocios']);
+    Route::get('/citas-negocios/{id_negocio}', [CitasNegociosController::class, 'obtenerCitasNegocio']);
 });
