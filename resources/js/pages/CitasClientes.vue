@@ -37,20 +37,29 @@ const formularioCitaCliente = ref({
     hora: ""
 })
 
-// Propiedad computada para obtener el nombre del servicio seleccionado
+// PROPIEDAD COMPUTADA PARA OBTENER EL NOMBRE DEL SERVICIO SELECCIONADO
 const nombreServicioSeleccionado = computed(() => {
-    // Si aún no han seleccionado un servicio, devolvemos un texto vacío
+    // SI AUN NO HAN SELECCIONADO UN SERVICIO, DEVOLVEMOS UN TEXTO VACIO
     if (!formularioCitaCliente.value.id_servicio) {
         return 'Sin asignar';
     }
 
-    // Buscamos dentro de tu arreglo 'servicios' el que coincida con el ID seleccionado
+    // BUSCAMOS DENTRO DE TU ARREGLO 'SERVICIOS' EL QUE COINCIDA CON EL ID SELECCIONADO
     const servicio = servicios.value.find(
         (s) => s.id === formularioCitaCliente.value.id_servicio
     );
 
-    // Si lo encuentra, devuelve el nombre. (Asegúrate de que 'nombre' sea la columna correcta de tu base de datos)
+    // SI LO ENCUENTRA, DEVUELVE EL NOMBRE
     return servicio ? servicio.nombre : 'Servicio desconocido';
+});
+
+// DETECTA SI EL SERVICIO SELECCIONADO TIENE UN ANTICIPO VALIDO (DIFERENTE DE NULL O 0)
+const requiereAnticipo = computed(() => {
+    if (!formularioCitaCliente.value.id_servicio) return false;
+
+    const servicio = servicios.value.find(s => s.id === formularioCitaCliente.value.id_servicio);
+    // RETORNA TRUE SI EL SERVICIO EXISTE Y SU ANTICIPO NO ES NULO NI CERO
+    return servicio && servicio.anticipo !== null && servicio.anticipo > 0;
 });
 
 // OBJETO PARA GESTIONAR LOS MENSAJES DE ERROR DE VALIDACIÓN
@@ -67,7 +76,7 @@ const eventos = computed(() => {
     return citas.value.map(cita => ({
         title: cita.cliente_nombre + "->" + cita.cliente_telefono,
         start: cita.fecha,
-        color: '#0d6efd' // azul bootstrap
+        color: '#0d6efd'
     }))
 })
 
@@ -196,8 +205,6 @@ const cargarCitas = async () => {
         if (data.valid){
             citas.value = data.citas;
             servicios.value = data.servicios;
-
-            // AGREGA ESTA LÍNEA AQUÍ:
             nombreNegocio.value = data.nombre_negocio;
 
             console.log(slug);
@@ -216,20 +223,25 @@ const guardarCitaCliente = async () => {
         return;
     }
 
-    // 1. Pedirle a Stripe que procese la tarjeta antes de guardar en tu BD
-    const { paymentMethod, error } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-            name: formularioCitaCliente.value.cliente_nombre,
-            email: formularioCitaCliente.value.cliente_email,
-        },
-    });
+    let stripePaymentMethodId = null;
+    // SOLO VALIDAMOS STRIPE SI HAY ANTICIPO
+    if (requiereAnticipo.value) {
+        // 1. PEDIRLE A STRIPE QUE POCESE LA TARJETA ANTES DE GUARDAR EN TU BD
+        const {paymentMethod, error} = await stripe.createPaymentMethod({
+            type: 'card',
+            card: cardElement,
+            billing_details: {
+                name: formularioCitaCliente.value.cliente_nombre,
+                email: formularioCitaCliente.value.cliente_email,
+            },
+        });
 
-    // Si la tarjeta falla (fondos insuficientes, numero mal, etc), detenemos todo
-    if (error) {
-        errorTarjeta.value = error.message;
-        return;
+        // SI LA TARJETA FALLA (FONDOS INSUFICIENTES, NUMERO MAL, ETC), DETENEMOS TODO
+        if (error) {
+            errorTarjeta.value = error.message;
+            return;
+        }
+        stripePaymentMethodId = paymentMethod.id;
     }
 
     try{
@@ -246,25 +258,22 @@ const guardarCitaCliente = async () => {
                 fecha: formularioCitaCliente.value.fecha,
                 slug: slug,
                 hora: formularioCitaCliente.value.hora,
-                payment_method_id: paymentMethod.id // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE
+                payment_method_id: stripePaymentMethodId // <-- MANDAMOS EL CÓDIGO SEGURO DE STRIPE (SERÁ NULL SI NO HAY ANTICIPO)
             })
         });
 
         const data = await response.json();
 
         if (data.requires_action) {
-            // 🔐 Stripe pide autenticación (3D Secure)
+            // 🔐 STRIPE PIDE AUTENTICACION (3D SECURE)
             const { error, paymentIntent } = await stripe.confirmCardPayment(data.client_secret);
-
             if (error) {
                 window.$toast.show(error.message, 'danger', 5000);
                 return;
             }
-
             if (paymentIntent.status === 'succeeded') {
                 window.$toast.show('¡Pago confirmado!', 'success', 5000);
             }
-
             return;
         }
 
@@ -272,6 +281,7 @@ const guardarCitaCliente = async () => {
             generarPDF();
             // SI EL REGISTRO ES EXITOSO, SE RECARGA EL CALENDARIO Y SE CIERRA EL MODAL
             // SE INSERTO CORRECTAMENTE LA CITA
+            cerrarModalCitaCliente();
             cargarCitas();
             mostrarModalCitaCliente.value = false;
             window.$toast.show(data.message, 'success', 5000);
@@ -284,23 +294,20 @@ const guardarCitaCliente = async () => {
 }
 
 const generarPDF = () => {
-    // 1. Obtenemos el elemento HTML que creamos
+    // 1. OBTENEMOS EL ELEMENTO HTML QUE CREAMOS
     const elemento = document.getElementById('comprobantePdf');
 
-    // 2. Configuramos las opciones del PDF
+    // 2. CONFIGURAMOS LAS OPCIONES DEL PDF
     const opciones = {
-        margin:       1, // Margen de 1 pulgada
-        filename:     `Cita_${formularioCitaCliente.value.cliente_nombre}.pdf`, // Nombre del archivo dinámico
+        margin:       1, // MARGEN DE 1 PULGADA
+        filename:     `Cita_${formularioCitaCliente.value.cliente_nombre}-${formularioCitaCliente.value.fecha}.pdf`, // NOMBRE DEL ARCHIVO DINAMICO
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2 }, // Mejora la calidad del texto
+        html2canvas:  { scale: 2 }, // MEJORA LA CALIDAD DEL TEXTO
         jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
 
-    // 3. Generamos y descargamos el PDF
+    // 3. GENERAMOS Y DESCARGAMOS EL PDF
     html2pdf().set(opciones).from(elemento).save();
-
-    // 4. (Opcional) Limpiar el formulario o cerrar el modal después de descargar
-    cerrarModalCitaCliente();
 }
 
 // FUNCIÓN DE VALIDACIÓN LÓGICA DE CAMPOS OBLIGATORIOS
@@ -387,7 +394,7 @@ const validarFormularioCitaCliente = () => {
                         <select class="form-select form-select-lg bg-light border-0 shadow-sm" v-model="formularioCitaCliente.id_servicio">
                             <option value="">Seleccionar servicio</option>
                             <option v-for="servicio in servicios" :value="servicio.id">
-                                {{ servicio.nombre + " - Duración: " + servicio.duracion_minutos + " minutos - Costo: $" + servicio.precio }}
+                                {{ servicio.nombre + " - Duración: " + servicio.duracion_minutos + " minutos - Costo: $" + servicio.precio }} {{ servicio.anticipo ? ' - Anticipo: $' + servicio.anticipo : '' }}
                             </option>
                         </select>
                         <small class="text-danger text-muted mt-1 d-block">
@@ -406,8 +413,8 @@ const validarFormularioCitaCliente = () => {
                             {{ erroresFormularioCitaCliente.hora }}
                         </small>
                     </div>
-                    <div class="mb-4 pt-2 border-top">
-                        <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3">
+                    <div class="mb-3 pt-2 border-top" v-show="requiereAnticipo">
+                        <label class="form-label fw-semibold text-secondary">
                             💳 Detalles de pago (Modo Prueba)
                         </label>
                         <div class="p-3 bg-light border" style="border-radius: 0.75rem;">

@@ -47,25 +47,27 @@ class CitasClientesController extends Controller
             // VERIFICA SI EL SERVICIO EXISTE EN LA BASE DE DATOS
             if ($servicioSeleccionado != null) {
                 // EXISTE SERVICIO
+                $anticipo = $servicioSeleccionado[0]->anticipo;
 
-                //REALIZAR PAGO CON STRIPE
-                $globalFuncion = new GlobalFuncion();
-                $respuestaPago  = $globalFuncion->pagoUnicoStripe($request->cliente_email, $negocio->id, $request->id_servicio, $request->payment_method_id, $servicioSeleccionado[0]->precio);
+                // REALIZAR PAGO CON STRIPE SOLO SI REQUIERE ANTICIPO
+                if (!empty($anticipo) && $anticipo > 0) {
+                    $globalFuncion = new GlobalFuncion();
+                    $respuestaPago = $globalFuncion->pagoUnicoStripe($request->cliente_email, $negocio->id, $request->id_servicio, $request->payment_method_id, $anticipo);
 
-                if (!$respuestaPago['valid']) {
-                    // 🔥 Si requiere autenticación (3D Secure)
-                    if (isset($respuestaPago['requires_action']) && $respuestaPago['requires_action']) {
+                    if (!$respuestaPago['valid']) {
+                        // 🔥 Si requiere autenticación (3D Secure)
+                        if (isset($respuestaPago['requires_action']) && $respuestaPago['requires_action']) {
+                            return response()->json([
+                                'requires_action' => true,
+                                'client_secret' => $respuestaPago['client_secret']
+                            ]);
+                        }
+                        // ❌ Error normal
                         return response()->json([
-                            'requires_action' => true,
-                            'client_secret' => $respuestaPago['client_secret']
-                        ]);
+                            'valid' => false,
+                            'message' => $respuestaPago['message']
+                        ], 400);
                     }
-
-                    // ❌ Error normal
-                    return response()->json([
-                        'valid' => false,
-                        'message' => $respuestaPago['message']
-                    ], 400);
                 }
 
                 // INSERCIÓN DE LOS DATOS DE LA CITA EN LA TABLA 'CITAS'
@@ -77,13 +79,45 @@ class CitasClientesController extends Controller
                     'cliente_email' => $request->cliente_email,
                     'fecha' => $request->fecha,
                     'hora' => $request->hora,   // HORA SELECCIONADA POR EL CLIENTE
-                    'anticipo' => "50",
+                    'anticipo' => $anticipo,
                     'total' => $servicioSeleccionado[0]->precio,    // PRECIO OBTENIDO DE LA BD
                     'estado' => '0',
                     'recordatorio_enviado' => '0',
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now()
                 ]);
+
+                // 1. PREPARAMOS LOS DATOS BASICOS QUE SE REPITEN
+                $fechaFormateada = Carbon::parse($request->fecha)->format('d/m/Y'); // Formato: día/mes/año
+                $hora = $request->hora;
+                $correo = $request->cliente_email;
+                $telefono = $request->cliente_telefono;
+                $idNegocio = $negocio->id;
+
+                // 2. CREAMOS Y GUARDAMOS EL PRIMER MOVIMIENTO (SIEMPRE SE GUARDA)
+                $mensajeCita = "Se agendo cita el {$fechaFormateada}, a las {$hora}, cliente: {$correo} y {$telefono}";
+
+                DB::table('movimientos_clientes')->insert([
+                    'id_negocio' => $idNegocio,
+                    'movimiento' => $mensajeCita,
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now(),
+                ]);
+
+                // 3. VERIFICAMOS SI HAY ANTICIPO PARA GUARDAR EL SEGUNDO MOVIMIENTO
+                // USAR EL ANTICIPO DE LA BD, NO DEL REQUEST
+                if (!empty($anticipo) && $anticipo > 0) {
+
+                    $mensajeAnticipo = "Se agrego anticipo de {$anticipo}, cliente: {$correo} y {$telefono}";
+
+                    DB::table('movimientos_clientes')->insert([
+                        'id_negocio' => $idNegocio,
+                        'movimiento' => $mensajeAnticipo,
+                        'created_at' => Carbon::now(),
+                        'updated_at' => Carbon::now(),
+                    ]);
+                }
+
                 // RETORNO DE CONFIRMACIÓN DE CREACIÓN
                 return response()->json([
                     'valid' => true,
