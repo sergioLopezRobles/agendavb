@@ -18,24 +18,28 @@ class TicketController extends Controller
         // 1. OBTENEMOS CATALOGOS
         $prioridades = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
         $estados = DB::table('estado_ticket_soporte_usuarios_negocios')->get();
+        $preguntas = DB::table('preguntas_frecuentes_ticket')->get(); // --> CARGAMOS PREGUNTAS
 
-        // 2. OBTENEMOS LOS NEGOCIOS DEL USUARIO (PARA EL COMBOBOX DEL MODAL)
+        // 2. OBTENEMOS LOS NEGOCIOS DEL USUARIO
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
-        // 3. OBTENEMOS LOS TICKETS DE ESTE USUARIO CON JOIN PARA TRAER LOS NOMBRES
+        // 3. OBTENEMOS LOS TICKETS DE ESTE USUARIO CON JOIN PARA TRAER NOMBRES Y PREGUNTAS
         $tickets = DB::table('ticket_soporte_usuarios_negocios as t')
             ->join('negocios as n', 't.id_negocio', '=', 'n.id')
             ->leftJoin('prioridad_ticket_soporte_usuarios_negocios as p', 't.id_prioridad', '=', 'p.id')
             ->join('estado_ticket_soporte_usuarios_negocios as e', 't.id_estado', '=', 'e.id')
+            ->leftJoin('preguntas_frecuentes_ticket as f', 't.id_pregunta', '=', 'f.id') // --> JOIN PREGUNTA
             ->where('t.id_usuario', $idUsuario)
             ->select(
                 't.id',
                 't.asunto',
                 't.id_estado',
                 't.id_prioridad',
+                't.id_pregunta',
                 'n.nombre as negocio_nombre',
                 'p.descripcion as prioridad_nombre',
                 'e.descripcion as estado_nombre',
+                'f.pregunta as pregunta_nombre', // --> TEXTO DE LA PREGUNTA FAQ
                 DB::raw("DATE_FORMAT(t.created_at, '%d/%m/%Y') as fecha")
             )
             ->orderBy('t.created_at', 'desc')
@@ -46,14 +50,14 @@ class TicketController extends Controller
             'tickets' => $tickets,
             'prioridades' => $prioridades,
             'estados' => $estados,
-            'negocios' => $negocios
+            'negocios' => $negocios,
+            'preguntas' => $preguntas // --> ENVIAMOS PREGUNTAS
         ]);
     }
 
     public function store(Request $request)
     {
         try {
-            // verificamos que el negocio pertenezca al usuario
             $negocio = DB::table('negocios')
                 ->where('id', $request->id_negocio)
                 ->where('id_usuario', Auth::id())
@@ -63,20 +67,23 @@ class TicketController extends Controller
                 return response()->json(['valid' => false, 'message' => 'Negocio no válido.']);
             }
 
-            // generamos id aleatorio tipo tkt-xxxx (4 caracteres alfanumericos mayusculas)
-            // usamos un ciclo para garantizar que nunca se repita en la base de datos
             do {
                 $idGenerado = 'TKT-' . strtoupper(Str::random(4));
                 $existe = DB::table('ticket_soporte_usuarios_negocios')->where('id', $idGenerado)->exists();
             } while ($existe);
 
+            // Si es diferente a "Otro" (99), guardamos el asunto vacío para ahorrar memoria.
+            // Si eligió "Otro", guardamos el texto que escribió manualmente en $request->asunto
+            $asuntoFinal = ($request->id_pregunta == 99) ? $request->asunto : '';
+
             DB::table('ticket_soporte_usuarios_negocios')->insert([
                 'id' => $idGenerado,
                 'id_usuario' => Auth::id(),
                 'id_negocio' => $request->id_negocio,
-                'asunto' => $request->asunto,
-                'id_prioridad' => null, // se guarda como nulo o por definir
-                'id_estado' => '1', // por defecto 1 = pendiente
+                'id_pregunta' => $request->id_pregunta, // --> GUARDAMOS LA PREGUNTA SELECCIONADA
+                'asunto' => $asuntoFinal, // --> GUARDAMOS EL TEXTO MANUAL SI ES 99
+                'id_prioridad' => null,
+                'id_estado' => '1',
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
             ]);

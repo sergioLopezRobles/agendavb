@@ -12,6 +12,7 @@ const tickets = ref([]);
 const prioridadesTicket = ref([]);
 const estadosTicket = ref([]);
 const misNegocios = ref([]);
+const preguntasFrecuentes = ref([]); // --> NUEVO ARREGLO PARA EL SELECT
 
 // VARIABLES DE FILTROS
 const buscar = ref('');
@@ -24,6 +25,7 @@ const errores = reactive({});
 
 const formularioTicket = reactive({
     id_negocio: '',
+    id_pregunta: '', // --> NUEVO CAMPO
     asunto: ''
 });
 
@@ -70,6 +72,7 @@ const cargarDatosTickets = async () => {
             prioridadesTicket.value = data.prioridades;
             estadosTicket.value = data.estados;
             misNegocios.value = data.negocios;
+            preguntasFrecuentes.value = data.preguntas; // --> GUARDAMOS LAS PREGUNTAS
         }
     } catch (error) {
         window.$toast.show('Error al cargar la información de tickets', 'danger', 4000);
@@ -79,15 +82,12 @@ const cargarDatosTickets = async () => {
 // COMPUTED PARA FILTRAR EN TIEMPO REAL
 const ticketsFiltrados = computed(() => {
     return tickets.value.filter(ticket => {
-        // filtro de texto
         const coincideTexto = ticket.id.toLowerCase().includes(buscar.value.toLowerCase()) ||
             ticket.asunto.toLowerCase().includes(buscar.value.toLowerCase()) ||
-            ticket.negocio_nombre.toLowerCase().includes(buscar.value.toLowerCase());
+            ticket.negocio_nombre.toLowerCase().includes(buscar.value.toLowerCase()) ||
+            (ticket.pregunta_nombre && ticket.pregunta_nombre.toLowerCase().includes(buscar.value.toLowerCase()));
 
-        // filtro de estado
         const coincideEstado = filtroEstado.value === '' || (ticket.id_estado && ticket.id_estado.toString() === filtroEstado.value);
-
-        // --> la correccion esta aqui: validamos que exista la prioridad antes de intentar filtrarla
         const coincidePrioridad = filtroPrioridad.value === '' || (ticket.id_prioridad && ticket.id_prioridad.toString() === filtroPrioridad.value);
 
         return coincideTexto && coincideEstado && coincidePrioridad;
@@ -98,6 +98,7 @@ const ticketsFiltrados = computed(() => {
 const abrirModalTicket = () => {
     Object.keys(errores).forEach(key => delete errores[key]);
     formularioTicket.id_negocio = '';
+    formularioTicket.id_pregunta = '';
     formularioTicket.asunto = '';
     mostrarModalTicket.value = true;
 };
@@ -115,8 +116,15 @@ const guardarTicket = async () => {
         errores.id_negocio = 'Debes seleccionar un negocio.';
         esValido = false;
     }
-    if (!formularioTicket.asunto.trim()) {
-        errores.asunto = 'El asunto es obligatorio.';
+
+    if (!formularioTicket.id_pregunta) {
+        errores.id_pregunta = 'Debes seleccionar un tipo de problema.';
+        esValido = false;
+    }
+
+    // SOLO VALIDA EL TEXTBOX SI SELECCIONÓ "OTRO" (ID 0)
+    if (formularioTicket.id_pregunta == 0 && !formularioTicket.asunto.trim()) {
+        errores.asunto = 'Por favor, describe tu problema detalladamente.';
         esValido = false;
     }
 
@@ -137,7 +145,7 @@ const guardarTicket = async () => {
         if(data.valid) {
             window.$toast.show(data.message, 'success', 4000);
             cerrarModalTicket();
-            cargarDatosTickets(); // RECARGAMOS LA TABLA
+            cargarDatosTickets();
         } else {
             window.$toast.show(data.message, 'warning', 4000);
         }
@@ -146,12 +154,11 @@ const guardarTicket = async () => {
     }
 };
 
-// --> funcion para abrir el modal con los datos cargados
 const verTicket = (ticket) => {
     ticketRevisar.id = ticket.id;
-    ticketRevisar.asunto = ticket.asunto;
+    // Si eligió una pregunta del catálogo, muestra eso en la revisión. Si eligió "Otro", muestra su texto manual.
+    ticketRevisar.asunto = ticket.id_pregunta == 0 ? ticket.asunto : ticket.pregunta_nombre;
     ticketRevisar.negocio_nombre = ticket.negocio_nombre;
-    // si la prioridad es nula, lo dejamos vacio para que seleccione una
     ticketRevisar.id_prioridad = ticket.id_prioridad || '';
     ticketRevisar.id_estado = ticket.id_estado;
 
@@ -162,7 +169,6 @@ const cerrarModalRevisar = () => {
     mostrarModalRevisar.value = false;
 };
 
-// --> variables para el modal de revision de tickets
 const mostrarModalRevisar = ref(false);
 const ticketRevisar = reactive({
     id: '',
@@ -172,7 +178,6 @@ const ticketRevisar = reactive({
     id_estado: ''
 });
 
-// --> funcion para enviar la actualizacion a laravel
 const actualizarTicket = async () => {
     if (!ticketRevisar.id_prioridad || !ticketRevisar.id_estado) {
         window.$toast.show('Debes seleccionar prioridad y estado', 'warning', 3000);
@@ -197,7 +202,7 @@ const actualizarTicket = async () => {
         if(data.valid) {
             window.$toast.show(data.message, 'success', 4000);
             cerrarModalRevisar();
-            cargarDatosTickets(); // recargamos la tabla para ver los cambios
+            cargarDatosTickets();
         } else {
             window.$toast.show(data.message, 'warning', 4000);
         }
@@ -299,7 +304,9 @@ const actualizarTicket = async () => {
                         <tr v-for="ticket in ticketsFiltrados" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket)">
                             <td class="px-4 py-3 fw-bold text-primary">{{ ticket.id }}</td>
                             <td class="px-4 py-3">
-                                <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">{{ ticket.asunto }}</div>
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">
+                                    {{ ticket.id_pregunta == 0 ? ticket.asunto : ticket.pregunta_nombre }}
+                                </div>
                                 <div class="text-muted small">🏢 {{ ticket.negocio_nombre }}</div>
                             </td>
                             <td class="px-4 py-3 text-center">
@@ -362,8 +369,19 @@ const actualizarTicket = async () => {
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">Asunto / Problema</label>
-                            <input type="text" v-model="formularioTicket.asunto" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. No puedo agregar servicios" :class="{'is-invalid': errores.asunto}">
+                            <label class="form-label fw-semibold text-secondary">¿Cuál es el problema?</label>
+                            <select v-model="formularioTicket.id_pregunta" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_pregunta}">
+                                <option value="" disabled>Selecciona una opción...</option>
+                                <option v-for="pregunta in preguntasFrecuentes" :key="pregunta.id" :value="pregunta.id">
+                                    {{ pregunta.pregunta }}
+                                </option>
+                            </select>
+                            <div class="invalid-feedback fw-medium">{{ errores.id_pregunta }}</div>
+                        </div>
+
+                        <div class="mb-3" v-if="formularioTicket.id_pregunta == 0">
+                            <label class="form-label fw-semibold text-secondary">Describe tu problema detalladamente</label>
+                            <textarea v-model="formularioTicket.asunto" rows="3" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Explícanos qué sucede..." :class="{'is-invalid': errores.asunto}"></textarea>
                             <div class="invalid-feedback fw-medium">{{ errores.asunto }}</div>
                         </div>
                     </div>
@@ -416,6 +434,5 @@ const actualizarTicket = async () => {
                 </div>
             </div>
         </div>
-
     </Layout>
 </template>
