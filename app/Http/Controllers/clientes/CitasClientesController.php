@@ -20,18 +20,14 @@ class CitasClientesController extends Controller
             abort(404);
         }
 
-        // CONSULTA A LA TABLA 'CITAS' FILTRANDO POR EL ID DE NEGOCIO 1
-        $citas = DB::table('citas')->where('id_negocio', $negocio->id)->get();
-
         // CONSULTA A LA TABLA 'SERVICIOS' FILTRANDO POR EL ID DE NEGOCIO 1
         $servicios = DB::table('servicios')->where('id_negocio', $negocio->id)->get();
 
         // REGISTRO DE LOS DATOS OBTENIDOS EN LOS LOGS
-        Log::info('citas: ' . $citas);
         Log::info('servicios: ' . $servicios);
 
         // RETORNO DE UNA RESPUESTA EN FORMATO JSON CON LOS DATOS Y ESTADO DE VALIDACIÓN
-        return response()->json(['valid' => true, 'citas' => $citas, 'servicios' => $servicios, 'nombre_negocio' => $negocio->nombre]);
+        return response()->json(['valid' => true, 'servicios' => $servicios, 'nombre_negocio' => $negocio->nombre]);
     }
 
     // REGISTRA UNA NUEVA CITA EN LA BASE DE DATOS VALIDANDO LA EXISTENCIA DEL SERVICIO
@@ -49,9 +45,11 @@ class CitasClientesController extends Controller
                 // EXISTE SERVICIO
                 $anticipo = $servicioSeleccionado[0]->anticipo;
 
+                $globalFuncion = new GlobalFuncion();
+
                 // REALIZAR PAGO CON STRIPE SOLO SI REQUIERE ANTICIPO
                 if (!empty($anticipo) && $anticipo > 0) {
-                    $globalFuncion = new GlobalFuncion();
+
                     $respuestaPago = $globalFuncion->pagoUnicoStripe($request->cliente_email, $negocio->id, $request->id_servicio, $request->payment_method_id, $anticipo);
 
                     if (!$respuestaPago['valid']) {
@@ -95,27 +93,12 @@ class CitasClientesController extends Controller
                 $idNegocio = $negocio->id;
 
                 // 2. CREAMOS Y GUARDAMOS EL PRIMER MOVIMIENTO (SIEMPRE SE GUARDA)
-                $mensajeCita = "Se agendo cita el {$fechaFormateada}, a las {$hora}, cliente: {$correo} y {$telefono}";
-
-                DB::table('movimientos_clientes')->insert([
-                    'id_negocio' => $idNegocio,
-                    'movimiento' => $mensajeCita,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now(),
-                ]);
+                $globalFuncion->guardarMovimientoCliente($idNegocio, "Se agendo cita el {$fechaFormateada}, a las {$hora}, cliente: {$correo} y {$telefono}");
 
                 // 3. VERIFICAMOS SI HAY ANTICIPO PARA GUARDAR EL SEGUNDO MOVIMIENTO
                 // USAR EL ANTICIPO DE LA BD, NO DEL REQUEST
                 if (!empty($anticipo) && $anticipo > 0) {
-
-                    $mensajeAnticipo = "Se agrego anticipo de {$anticipo}, cliente: {$correo} y {$telefono}";
-
-                    DB::table('movimientos_clientes')->insert([
-                        'id_negocio' => $idNegocio,
-                        'movimiento' => $mensajeAnticipo,
-                        'created_at' => Carbon::now(),
-                        'updated_at' => Carbon::now(),
-                    ]);
+                    $globalFuncion->guardarMovimientoCliente($idNegocio, "Se agrego anticipo de {$anticipo}, cliente: {$correo} y {$telefono}");
                 }
 
                 // RETORNO DE CONFIRMACIÓN DE CREACIÓN

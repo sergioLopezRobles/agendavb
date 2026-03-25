@@ -121,4 +121,14 @@ class GlobalFuncion
             ];
         }
     }
+
+    public function guardarMovimientoCliente($idNegocio, $movimiento)
+    {
+        DB::table('movimientos_clientes')->insert([
+            'id_negocio' => $idNegocio,
+            'movimiento' => $movimiento,
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+    }
 }

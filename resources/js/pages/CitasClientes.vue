@@ -18,8 +18,7 @@ let stripe = null;
 let cardElement = null;
 const errorTarjeta = ref('');
 
-// ALMACENAR CITAS Y SERVICIOS
-const citas = ref([]);
+// ALMACENAR SERVICIOS
 const servicios = ref([]);
 const horariosDisponibles = ref([]);
 const nombreNegocio = ref('');
@@ -71,22 +70,18 @@ const erroresFormularioCitaCliente = ref({
     hora: ""
 })
 
-// PROPIEDAD COMPUTADA QUE TRANSFORMA LOS DATOS DE LAS CITAS AL FORMATO QUE REQUIERE EL CALENDARIO
-const eventos = computed(() => {
-    return citas.value.map(cita => ({
-        title: cita.cliente_nombre + "->" + cita.cliente_telefono,
-        start: cita.fecha,
-        color: '#0d6efd'
-    }))
-})
-
 // CONFIGURACIÓN DE LAS OPCIONES DEL CALENDARIO (VISTA, IDIOMA, EVENTOS Y HORARIOS)
 const calendarOptions = ref({
     plugins: [dayGridPlugin, interactionPlugin],
     initialView: 'dayGridMonth',
     locale: 'es',
-    events: eventos,
     dateClick: handleDateClick,
+    aspectRatio: 1.5, // Ajusta esto para controlar la altura (1.8 es más bajito)
+    headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: '' // Quitamos botones innecesarios para que se vea más limpio
+    },
     businessHours: [
         {
             daysOfWeek: [1,2,3,4,5,6] // lunes a sábado
@@ -190,7 +185,7 @@ const obtenerHorariosDisponibles = async () => {
     }
 }
 
-// FUNCIÓN ASÍNCRONA PARA OBTENER LAS CITAS DESDE LA BD
+// FUNCIÓN ASÍNCRONA PARA OBTENER LOS SERVICIOS DESDE LA BD
 const cargarCitas = async () => {
     try{
         // SE AGREGO EL SLUG DEL NEGOCIO
@@ -203,7 +198,6 @@ const cargarCitas = async () => {
         const data = await response.json();
 
         if (data.valid){
-            citas.value = data.citas;
             servicios.value = data.servicios;
             nombreNegocio.value = data.nombre_negocio;
 
@@ -211,7 +205,7 @@ const cargarCitas = async () => {
             //window.$toast.show('Se cargaron las citas correctamente', 'success', 5000);
         }
     }catch (error){
-        window.$toast.show('Error al cargar citas', 'danger', 5000);
+        window.$toast.show('Error al cargar servicios', 'danger', 5000);
     }
 }
 
@@ -357,9 +351,38 @@ const validarFormularioCitaCliente = () => {
 
 </script>
 <template>
-    <h1>Calendario de Citas de cliente</h1>
+    <div class="container py-5">
 
-    <FullCalendar :options="calendarOptions"/>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 class="fw-bold mb-0 text-dark">Calendario de Citas</h4>
+                <p class="text-muted small mb-0">Selecciona una fecha para agendar tu servicio en {{ nombreNegocio }}</p>
+            </div>
+            <div class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill">
+                Modo Cliente Activo
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+            <div class="card-body p-4">
+                <div class="mx-auto" style="max-width: 900px;">
+                    <FullCalendar :options="calendarOptions"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4 g-3">
+            <div class="col-md-4">
+                <div class="d-flex align-items-center p-3 bg-white rounded-3 shadow-sm">
+                    <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">🟢</div>
+                    <div>
+                        <small class="text-muted d-block">Días Disponibles</small>
+                        <span class="fw-bold">Lunes a Sábado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div v-if="mostrarModalCitaCliente" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0 shadow-lg rounded-4">
@@ -451,3 +474,58 @@ const validarFormularioCitaCliente = () => {
         </div>
     </div>
 </template>
+<style>
+/* Personalización de FullCalendar para que combine con el estilo "Ticket" */
+:deep(.fc) {
+    --fc-border-color: #f0f0f0;
+    --fc-button-bg-color: #0d6efd;
+    --fc-button-border-color: #0d6efd;
+    --fc-button-hover-bg-color: #0b5ed7;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Redondear botones de la cabecera del calendario */
+:deep(.fc .fc-button) {
+    border-radius: 8px;
+    font-weight: 600;
+    text-transform: capitalize;
+    padding: 8px 16px;
+}
+
+/* Estilo para los números de los días */
+:deep(.fc .fc-daygrid-day-number) {
+    padding: 10px;
+    font-weight: 500;
+    color: #495057;
+    text-decoration: none;
+}
+
+/* Resaltar el día actual */
+:deep(.fc .fc-day-today) {
+    background-color: rgba(13, 110, 253, 0.05) !important;
+}
+
+/* Estilo de los eventos (Citas existentes) */
+:deep(.fc-event) {
+    border-radius: 4px;
+    padding: 2px 5px;
+    font-size: 0.85em;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Quitar bordes exteriores pesados */
+:deep(.fc-theme-standard td, .fc-theme-standard th) {
+    border: 1px solid #f8f9fa;
+}
+
+:deep(.fc-col-header-cell) {
+    background-color: #f8f9fa;
+    padding: 12px 0 !important;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+</style>
