@@ -3,15 +3,17 @@ import { ref, reactive, computed } from 'vue';
 export function useServicios(token) {
     const mostrarModalServicios    = ref(false);
     const mostrarModalFormServicio = ref(false);
-    const negocioActualServicios   = ref(null);
+    const negocioActualServicios= ref(null);
     const servicios                = ref([]);
     const busquedaServicio         = ref('');
     const esEditarServicio         = ref(false);
     const minutosDisponibles       = ref([]);
-    const limiteServicios          = ref(null);   // null = ilimitado
+    const limiteServicios      = ref(null);
     const totalServicios           = ref(0);
+    const porcentajeAnticipo       = ref(0);
 
-    const formularioServicio = reactive({ id: '', nombre: '', precio: '', duracion_minutos: '' });
+    // -> AGREGAMOS 'anticipo' AL FORMULARIO
+    const formularioServicio = reactive({ id: '', nombre: '', precio: '', anticipo: '', duracion_minutos: '' });
     const erroresServicio    = reactive({});
 
     // ── COMPUTED ──────────────────────────────────────────────────────────────
@@ -23,6 +25,12 @@ export function useServicios(token) {
         );
     });
 
+    // -> CALCULO MATEMÁTICO DEL MÍNIMO REQUERIDO
+    const anticipoMinimo = computed(() => {
+        if (!formularioServicio.precio || isNaN(formularioServicio.precio)) return 0;
+        return (Number(formularioServicio.precio) * Number(porcentajeAnticipo.value)) / 100;
+    });
+
     // ── HELPERS ───────────────────────────────────────────────────────────────
 
     const authHeaders = () => ({
@@ -32,6 +40,11 @@ export function useServicios(token) {
 
     const limpiarErroresServicio = () =>
         Object.keys(erroresServicio).forEach(k => delete erroresServicio[k]);
+
+    // -> FUNCIÓN PARA AUTO-RELLENAR EL ANTICIPO
+    const setAnticipoMinimo = () => {
+        formularioServicio.anticipo = anticipoMinimo.value.toFixed(2);
+    };
 
     // ── API ───────────────────────────────────────────────────────────────────
 
@@ -48,6 +61,7 @@ export function useServicios(token) {
                 minutosDisponibles.value = data.minutos_permitidos;
                 limiteServicios.value    = data.limite_servicios;
                 totalServicios.value     = data.total_servicios;
+                porcentajeAnticipo.value = data.porcentaje_anticipo; // -> GUARDAMOS EL % DEL PLAN
             }
         } catch {
             window.$toast.show('Error al cargar servicios', 'danger', 3000);
@@ -67,7 +81,20 @@ export function useServicios(token) {
             esValido = false;
         }
         if (!formularioServicio.duracion_minutos || formularioServicio.duracion_minutos <= 0) {
-            erroresServicio.duracion = 'Ingresa una duración en minutos válida.';
+            erroresServicio.duracion = 'Ingresa una duración válida.';
+            esValido = false;
+        }
+
+        // -> VALIDACIONES DE REGLA DE NEGOCIO (ANTICIPO)
+        const precioTotal = Number(formularioServicio.precio);
+        const anticipoIngresado = Number(formularioServicio.anticipo);
+
+        if (formularioServicio.anticipo === '' || anticipoIngresado < anticipoMinimo.value) {
+            erroresServicio.anticipo = `El anticipo mínimo debe ser de $${anticipoMinimo.value.toFixed(2)}`;
+            esValido = false;
+        }
+        if (anticipoIngresado > precioTotal) {
+            erroresServicio.anticipo = 'El anticipo no puede ser mayor al costo total del servicio.';
             esValido = false;
         }
 
@@ -84,6 +111,7 @@ export function useServicios(token) {
                     id_negocio:        negocioActualServicios.value.id,
                     nombre:            formularioServicio.nombre,
                     precio:            formularioServicio.precio,
+                    anticipo:          formularioServicio.anticipo, // -> ENVIAMOS PAYLOAD
                     duracion_minutos:  formularioServicio.duracion_minutos
                 })
             });
@@ -131,11 +159,10 @@ export function useServicios(token) {
     const abrirFormularioServicio = (servicio = null) => {
         limpiarErroresServicio();
 
-        // Validación de límite solo al crear
         if (!servicio) {
             if (limiteServicios.value !== null && totalServicios.value >= Number(limiteServicios.value)) {
                 window.$toast.show(
-                    `Tu plan permite un máximo de ${limiteServicios.value} servicios. Mejora tu plan para agregar más.`,
+                    `Tu plan permite un máximo de ${limiteServicios.value} servicios. Mejora tu plan.`,
                     'warning',
                     4000
                 );
@@ -148,12 +175,14 @@ export function useServicios(token) {
             formularioServicio.id               = servicio.id;
             formularioServicio.nombre           = servicio.nombre;
             formularioServicio.precio           = servicio.precio;
+            formularioServicio.anticipo         = servicio.anticipo; // -> MAPEAR AL EDITAR
             formularioServicio.duracion_minutos = servicio.duracion_minutos;
         } else {
             esEditarServicio.value              = false;
             formularioServicio.id               = '';
             formularioServicio.nombre           = '';
             formularioServicio.precio           = '';
+            formularioServicio.anticipo         = '';
             formularioServicio.duracion_minutos = '';
         }
 
@@ -167,14 +196,12 @@ export function useServicios(token) {
     };
 
     return {
-        // state
         mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
         servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
         limiteServicios, totalServicios, formularioServicio, erroresServicio,
-        // computed
+        porcentajeAnticipo, anticipoMinimo, // -> EXPORTAMOS A LA UI
         serviciosFiltrados,
-        // methods
         abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
-        cargarServiciosNegocio, guardarServicio, eliminarServicio
+        cargarServiciosNegocio, guardarServicio, eliminarServicio, setAnticipoMinimo
     };
 }

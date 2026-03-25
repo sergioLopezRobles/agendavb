@@ -16,6 +16,9 @@ return new class extends Migration
             $table->string('id');
             $table->string('id_usuario');
             $table->string('id_negocio');
+            //NUEVO CAMPO AGREGADO AQUÍ
+            $table->integer('id_pregunta');
+            // El asunto servirá para guardar el texto cuando elijan "Otro"
             $table->string('asunto');
             $table->string('id_prioridad')->nullable();
             $table->string('id_estado');

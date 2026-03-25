@@ -17,23 +17,21 @@ class NegocioController extends Controller
     public function registrarPlanNegocio(Request $request)
     {
         try {
-            // ======================================================
-            // 1. LÓGICA DE STRIPE (SUSCRIPCIONES RECURRENTES) ENCENDIDA
-            // ======================================================
-            // COMENTA DESDE AQUÍ
-
+            // COMENTA AQUI PARA DESACTIVAR STRIPE (BACKEND)
+            /*
             Stripe::setApiKey(config('services.stripe.secret'));
 
-            // a) Mapear los planes a los IDs de Precio de Stripe
-            $preciosStripe = [
-                1 => 'price_1T8vySCPQ2Qy65AdXblJIcCw', // Básico
-                2 => 'price_1T8vyrCPQ2Qy65AdxgyLrYm3', // Medio
-                3 => 'price_1T8vz5CPQ2Qy65AdLIyKXr8M'  // Avanzado
-            ];
+            $planStripe = DB::table('planes_stripe')->where('id_plan', $request->plan)->first();
 
-            $priceId = $preciosStripe[$request->plan] ?? 'price_1T8vySCPQ2Qy65AdXblJIcCw';
+            if(!$planStripe) {
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'El plan seleccionado no está configurado correctamente en los pagos.'
+                ]);
+            }
 
-            // b) Crear el Cliente en Stripe y asignarle la tarjeta
+            $priceId = $planStripe->stripe_price_id;
+
             $customer = Customer::create([
                 'name' => $request->nombre,
                 'email' => $request->email,
@@ -43,7 +41,6 @@ class NegocioController extends Controller
                 ],
             ]);
 
-            // c) Crear la Suscripción recurrente
             $subscription = Subscription::create([
                 'customer' => $customer->id,
                 'items' => [
@@ -52,7 +49,6 @@ class NegocioController extends Controller
                 'expand' => ['latest_invoice.payment_intent'],
             ]);
 
-            // d) GUARDAR LA SUSCRIPCIÓN EN TU BASE DE DATOS
             DB::table('suscripciones_stripe')->insert([
                 'id_usuario' => Auth::id(),
                 'nombre' => 'Plan ' . $request->plan,
@@ -63,25 +59,21 @@ class NegocioController extends Controller
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
             ]);
-            //HASTA AQUÍ
+            */
+            // HASTA AQUI
 
-            // ======================================================
-            // 2. GUARDAR EL NEGOCIO EN TU BASE DE DATOS
-            // ======================================================
-
-            // ACTUALIZAR AL USUARIO
             DB::table('users')
                 ->where('id', Auth::id())
                 ->update(['id_plan' => $request->plan]);
 
-            // GENERAR SLUG
-            $slugFinal = $request->slug;
+            // GENERAR Y LIMPIAR EL SLUG (Evita espacios y caracteres especiales)
+            $slugFinal = $request->slug ? \Illuminate\Support\Str::slug($request->slug) : null;
+
             if (empty($slugFinal)) {
                 $slugBase = \Illuminate\Support\Str::slug(substr($request->nombre, 0, 12));
                 $slugFinal = $slugBase . '-' . strtolower(\Illuminate\Support\Str::random(4));
             }
 
-            // INSERTAR EL NEGOCIO
             $idNegocio = DB::table('negocios')->insertGetId([
                 'id_usuario' => Auth::id(),
                 'id_plan' => $request->plan,
@@ -92,7 +84,6 @@ class NegocioController extends Controller
                 'updated_at' => Carbon::now()
             ]);
 
-            // INSERTAR TELÉFONOS
             if ($request->has('telefonos') && is_array($request->telefonos)) {
                 $telefonosInsert = [];
                 foreach ($request->telefonos as $tel) {
@@ -111,7 +102,6 @@ class NegocioController extends Controller
                 }
             }
 
-            // INSERTAR HORARIOS
             if ($request->has('horarios') && is_array($request->horarios)) {
                 $horariosInsert = [];
                 foreach ($request->horarios as $horario) {

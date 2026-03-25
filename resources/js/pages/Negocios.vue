@@ -1,7 +1,8 @@
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import Layout   from '../componentes/Layout.vue';
 import PlanCard from '../componentes/PlanCard.vue';
+import QrcodeVue from 'qrcode.vue'; // --> IMPORTAMOS LA LIBRERÍA DE QR
 
 import { useNegocios  } from '../composables/useNegocios.js';
 import { useServicios } from '../composables/useServicios.js';
@@ -25,10 +26,66 @@ const {
     mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
     servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
     limiteServicios, totalServicios, formularioServicio, erroresServicio,
-    serviciosFiltrados,
+    serviciosFiltrados, porcentajeAnticipo, anticipoMinimo, setAnticipoMinimo,
     abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
     guardarServicio, eliminarServicio
 } = useServicios(token);
+
+// ── LÓGICA DE COPIAR PORTAPAPELES Y CÓDIGO QR ─────────────────────────────────
+const mostrarModalQR = ref(false);
+const negocioActualQR = ref(null);
+
+const copiarSlug = async (slug) => {
+    const url = `https://${slug}`;
+
+    // Si tiene HTTPS (Producción)
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(url);
+            window.$toast.show('¡Enlace copiado al portapapeles! 📋', 'success', 3000);
+        } catch (err) {
+            window.$toast.show('Error al copiar el enlace', 'danger', 3000);
+        }
+    } else {
+        // Método de respaldo para HTTP (Laragon local)
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = url;
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+
+            window.$toast.show('¡Enlace copiado al portapapeles! 📋', 'success', 3000);
+        } catch (err) {
+            window.$toast.show('Error al copiar el enlace', 'danger', 3000);
+        }
+    }
+};
+
+const abrirModalQR = (negocio) => {
+    negocioActualQR.value = negocio;
+    mostrarModalQR.value = true;
+};
+
+const descargarQR = () => {
+    // Buscamos el canvas que genera la librería qrcode.vue
+    const canvas = document.querySelector('.qr-container canvas');
+    if (canvas) {
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `QR_${negocioActualQR.value.slug}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.$toast.show('¡Código QR descargado! ⬇️', 'success', 3000);
+    }
+};
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 onMounted(() => {
@@ -40,7 +97,6 @@ onMounted(() => {
 <template>
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
 
-        <!-- ENCABEZADO -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Gestión de Negocios</h4>
@@ -54,14 +110,14 @@ onMounted(() => {
             </button>
         </div>
 
-        <!-- TABLA DE NEGOCIOS -->
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                     <tr>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Nombre</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Enlace (Slug)</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Enlace (Público)</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">QR</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Correo</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Teléfonos</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Horarios</th>
@@ -74,10 +130,14 @@ onMounted(() => {
                             <span class="fs-5 me-2">🏪</span>{{ negocio.nombre }}
                         </td>
                         <td class="px-4 py-3">
-                            <a :href="`https://${negocio.slug}`" target="_blank" class="text-decoration-none text-primary">
-                                {{ negocio.slug }}
-                            </a>
+                            <div @click="copiarSlug(negocio.slug)" class="d-inline-flex align-items-center bg-primary bg-opacity-10 px-3 py-1 rounded-pill text-primary fw-medium copy-pill" title="Clic para copiar enlace">
+                                <span class="me-2 fs-6">🔗</span> {{ negocio.slug }}
+                            </div>
                         </td>
+                        <td class="px-4 py-3">
+                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2" title="Generar código QR">📱</button>
+                        </td>
+
                         <td class="px-4 py-3 text-muted">{{ negocio.email }}</td>
                         <td class="px-4 py-3 text-muted">
                             <span class="badge bg-info text-dark rounded-pill shadow-sm">{{ negocio.telefonos?.length || 0 }} Números</span>
@@ -100,7 +160,30 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- MODAL: EDITAR NEGOCIO -->
+        <div v-if="mostrarModalQR" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn-close shadow-none" @click="mostrarModalQR = false"></button>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5 class="fw-bolder text-dark mb-1">Tu Código QR</h5>
+                        <p class="text-muted small mb-0">Escanea para ir a tu agenda</p>
+                        <p class="text-primary fw-bold small mt-1">{{ negocioActualQR?.nombre }}</p>
+                    </div>
+
+                    <div class="qr-container bg-white p-3 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
+                        <qrcode-vue :value="`https://${negocioActualQR?.slug}`" :size="200" level="H" foreground="#000000" />
+                    </div>
+
+                    <button @click="descargarQR" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm d-flex justify-content-center align-items-center">
+                        <span class="fs-5 me-2">⬇️</span> Descargar PNG
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="mostrarModalEdicion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -164,7 +247,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- MODAL: CREAR NEGOCIO -->
         <div v-if="mostrarModalCreacion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -225,7 +307,15 @@ onMounted(() => {
                             </label>
                             <div class="input-group has-validation shadow-sm" @click="planAdquirido?.id < 3 ? intentarAccesoPremium(3) : null">
                                 <span class="input-group-text bg-white border-end-0" :class="{'text-muted': planAdquirido?.id < 3}">www.agendavb/</span>
-                                <input type="text" v-model="nuevoNegocio.slug" class="form-control form-control-lg border-start-0" :class="{ 'is-invalid': errores.slug, 'bg-light text-muted': planAdquirido?.id < 3 }" placeholder="mi-nueva-sucursal" :readonly="planAdquirido?.id < 3">
+                                <input
+                                    type="text"
+                                    v-model="nuevoNegocio.slug"
+                                    @input="nuevoNegocio.slug = nuevoNegocio.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')"
+                                    class="form-control form-control-lg border-start-0"
+                                    :class="{ 'is-invalid': errores.slug, 'bg-light text-muted': planAdquirido?.id < 3 }"
+                                    placeholder="mi-nueva-sucursal"
+                                    :readonly="planAdquirido?.id < 3"
+                                >
                                 <div class="invalid-feedback fw-medium">{{ errores.slug }}</div>
                             </div>
                         </div>
@@ -239,7 +329,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- MODAL: UPGRADE DE PLAN -->
         <div v-if="mostrarModalUpgrade" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); backdrop-filter: blur(5px);">
             <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content border-0 shadow-lg rounded-4 bg-light">
@@ -263,7 +352,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- MODAL: LISTADO DE SERVICIOS -->
         <div v-if="mostrarModalServicios" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -297,7 +385,8 @@ onMounted(() => {
                                 <thead class="bg-light">
                                 <tr>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Nombre</th>
-                                    <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Precio</th>
+                                    <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Precio Total</th>
+                                    <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Anticipo Fijo</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Duración</th>
                                     <th class="py-3 px-3 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                                 </tr>
@@ -306,6 +395,7 @@ onMounted(() => {
                                 <tr v-for="servicio in serviciosFiltrados" :key="servicio.id">
                                     <td class="px-3 py-3 fw-bold text-dark">{{ servicio.nombre }}</td>
                                     <td class="px-3 py-3 text-success fw-bold">${{ servicio.precio }}</td>
+                                    <td class="px-3 py-3 text-primary fw-bold">${{ servicio.anticipo }}</td>
                                     <td class="px-3 py-3 text-muted">{{ servicio.duracion_minutos }} min</td>
                                     <td class="px-3 py-3 text-end">
                                         <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary p-2 me-2">Editar</button>
@@ -313,7 +403,7 @@ onMounted(() => {
                                     </td>
                                 </tr>
                                 <tr v-if="serviciosFiltrados.length === 0">
-                                    <td colspan="4" class="text-center py-4 text-muted">No se encontraron servicios.</td>
+                                    <td colspan="5" class="text-center py-4 text-muted">No se encontraron servicios.</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -323,7 +413,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- MODAL: FORM SERVICIO -->
         <div v-if="mostrarModalFormServicio" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6);">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -339,7 +428,7 @@ onMounted(() => {
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-semibold text-secondary">Precio</label>
+                                <label class="form-label fw-semibold text-secondary">Precio Total</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-0">$</span>
                                     <input type="number" step="0.01" v-model="formularioServicio.precio" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.precio }">
@@ -347,7 +436,19 @@ onMounted(() => {
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label class="form-label fw-semibold text-secondary">Duración</label>
+                                <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
+                                    <span>Pago de Anticipo</span>
+                                    <span v-if="formularioServicio.precio" class="badge bg-primary text-white cursor-pointer" @click="setAnticipoMinimo" style="cursor: pointer;" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light border-0">$</span>
+                                    <input type="number" step="0.01" v-model="formularioServicio.anticipo" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.anticipo }" placeholder="Ej. 100.00">
+                                    <div class="invalid-feedback fw-medium">{{ erroresServicio.anticipo }}</div>
+                                </div>
+                                <small class="text-muted d-block mt-1">El cliente deberá abonar esto al agendar.</small>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label fw-semibold text-secondary">Duración de la cita</label>
                                 <div class="input-group">
                                     <select v-model="formularioServicio.duracion_minutos" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.duracion }">
                                         <option value="" disabled>Selecciona...</option>
@@ -366,6 +467,16 @@ onMounted(() => {
                 </div>
             </div>
         </div>
-
     </Layout>
 </template>
+
+<style scoped>
+.copy-pill {
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+.copy-pill:hover {
+    background-color: rgba(13, 110, 253, 0.2) !important;
+    transform: scale(1.02);
+}
+</style>
