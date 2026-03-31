@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('stripe_id')->unique(); // El ID de la suscripción sub_xxx
             $table->string('stripe_status'); // active, past_due, canceled
             $table->string('stripe_price')->nullable(); // price_xxx
+            $table->timestamp('current_period_start')->nullable(); // Quitamos el ->after()
+            $table->timestamp('current_period_end')->nullable();   // Quitamos el ->after()
             $table->integer('quantity')->default(1);
             $table->timestamp('trial_ends_at')->nullable();
             $table->timestamp('ends_at')->nullable();

@@ -31,16 +31,11 @@ export function useNegocios() {
     const horariosEdicion = ref([]);
 
     // ── COMPUTED ──────────────────────────────────────────────────────────────
-
     const limiteTelefonos = computed(() => {
-        if (planAdquirido.value?.id == 1) return 3;
-        if (planAdquirido.value?.id == 2) return 5;
-        if (planAdquirido.value?.id == 3) return 10;
-        return 3;
+        return Number(planAdquirido.value?.limite_telefonos_negocios) || 3;
     });
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
-
     const limpiarErrores = () => Object.keys(errores).forEach(k => delete errores[k]);
 
     const authHeaders = () => ({
@@ -111,8 +106,7 @@ export function useNegocios() {
                 usuarioLoggeado.value = data.usuarioLoggeado;
                 planAdquirido.value  = data.planAdquirido;
 
-                const limitesPorPlan   = { 1: 1, 2: 3, 3: 6 };
-                limiteNegocios.value   = limitesPorPlan[data.planAdquirido.id] || 1;
+                limiteNegocios.value = Number(data.planAdquirido.maximonegocios) || 1;
             }
         } catch {
             window.$toast.show('Error al cargar la tabla de negocios', 'danger', 4000);

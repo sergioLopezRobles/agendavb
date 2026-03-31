@@ -3,20 +3,18 @@ import { ref, reactive, computed } from 'vue';
 export function useServicios(token) {
     const mostrarModalServicios    = ref(false);
     const mostrarModalFormServicio = ref(false);
-    const negocioActualServicios= ref(null);
+    const negocioActualServicios   = ref(null);
     const servicios                = ref([]);
     const busquedaServicio         = ref('');
     const esEditarServicio         = ref(false);
     const minutosDisponibles       = ref([]);
-    const limiteServicios      = ref(null);
+    const limiteServicios          = ref(null);
     const totalServicios           = ref(0);
-    const porcentajeAnticipo       = ref(0);
+    const minimoAnticipoPlan       = ref(0); // -> AHORA ES UN VALOR FIJO (10, 25, 50)
 
-    // -> AGREGAMOS 'anticipo' AL FORMULARIO
-    const formularioServicio = reactive({ id: '', nombre: '', precio: '', anticipo: '', duracion_minutos: '' });
+    // -> AGREGAMOS 'tarjeta' AL FORMULARIO
+    const formularioServicio = reactive({ id: '', nombre: '', precio: '', anticipo: '', tarjeta: '0', duracion_minutos: '' });
     const erroresServicio    = reactive({});
-
-    // ── COMPUTED ──────────────────────────────────────────────────────────────
 
     const serviciosFiltrados = computed(() => {
         if (!busquedaServicio.value) return servicios.value;
@@ -25,13 +23,10 @@ export function useServicios(token) {
         );
     });
 
-    // -> CALCULO MATEMÁTICO DEL MÍNIMO REQUERIDO
+    // -> EL ANTICIPO MÍNIMO AHORA ES DIRECTAMENTE EL VALOR DEL PLAN
     const anticipoMinimo = computed(() => {
-        if (!formularioServicio.precio || isNaN(formularioServicio.precio)) return 0;
-        return (Number(formularioServicio.precio) * Number(porcentajeAnticipo.value)) / 100;
+        return Number(minimoAnticipoPlan.value);
     });
-
-    // ── HELPERS ───────────────────────────────────────────────────────────────
 
     const authHeaders = () => ({
         'Content-Type': 'application/json',
@@ -41,12 +36,9 @@ export function useServicios(token) {
     const limpiarErroresServicio = () =>
         Object.keys(erroresServicio).forEach(k => delete erroresServicio[k]);
 
-    // -> FUNCIÓN PARA AUTO-RELLENAR EL ANTICIPO
     const setAnticipoMinimo = () => {
         formularioServicio.anticipo = anticipoMinimo.value.toFixed(2);
     };
-
-    // ── API ───────────────────────────────────────────────────────────────────
 
     const cargarServiciosNegocio = async () => {
         try {
@@ -61,7 +53,7 @@ export function useServicios(token) {
                 minutosDisponibles.value = data.minutos_permitidos;
                 limiteServicios.value    = data.limite_servicios;
                 totalServicios.value     = data.total_servicios;
-                porcentajeAnticipo.value = data.porcentaje_anticipo; // -> GUARDAMOS EL % DEL PLAN
+                minimoAnticipoPlan.value = data.minimo_anticipo; // -> GUARDAMOS EL MÍNIMO FIJO
             }
         } catch {
             window.$toast.show('Error al cargar servicios', 'danger', 3000);
@@ -85,20 +77,28 @@ export function useServicios(token) {
             esValido = false;
         }
 
-        // -> VALIDACIONES DE REGLA DE NEGOCIO (ANTICIPO)
+        // -> VALIDACIONES DE ANTICIPO
         const precioTotal = Number(formularioServicio.precio);
-        const anticipoIngresado = Number(formularioServicio.anticipo);
+        const anticipoIngresado = Number(formularioServicio.anticipo) || 0;
 
-        if (formularioServicio.anticipo === '' || anticipoIngresado < anticipoMinimo.value) {
-            erroresServicio.anticipo = `El anticipo mínimo debe ser de $${anticipoMinimo.value.toFixed(2)}`;
-            esValido = false;
+        // Si el cobro por tarjeta está activo, EXIGIMOS el mínimo (no se permite 0 ni vacío)
+        if (formularioServicio.tarjeta === '1') {
+            if (anticipoIngresado < anticipoMinimo.value) {
+                erroresServicio.anticipo = `Al cobrar con tarjeta, el anticipo mínimo debe ser de $${anticipoMinimo.value.toFixed(2)}`;
+                esValido = false;
+            }
         }
+
+        // No puede ser mayor al precio del servicio
         if (anticipoIngresado > precioTotal) {
             erroresServicio.anticipo = 'El anticipo no puede ser mayor al costo total del servicio.';
             esValido = false;
         }
 
         if (!esValido) return;
+
+        // -> PREPARAR EL PAYLOAD (Convertir a nulo si es Efectivo y dejaron 0)
+        let anticipoFinal = anticipoIngresado > 0 ? anticipoIngresado : null;
 
         try {
             const endpoint = esEditarServicio.value ? `/api/servicios/${formularioServicio.id}` : `/api/servicios`;
@@ -111,7 +111,8 @@ export function useServicios(token) {
                     id_negocio:        negocioActualServicios.value.id,
                     nombre:            formularioServicio.nombre,
                     precio:            formularioServicio.precio,
-                    anticipo:          formularioServicio.anticipo, // -> ENVIAMOS PAYLOAD
+                    anticipo:          anticipoFinal, // Se va nulo si es 0
+                    tarjeta:           formularioServicio.tarjeta, // '1' o '0'
                     duracion_minutos:  formularioServicio.duracion_minutos
                 })
             });
@@ -147,8 +148,6 @@ export function useServicios(token) {
         }
     };
 
-    // ── MODALES ───────────────────────────────────────────────────────────────
-
     const abrirServicios = (negocio) => {
         negocioActualServicios.value = negocio;
         busquedaServicio.value       = '';
@@ -175,7 +174,8 @@ export function useServicios(token) {
             formularioServicio.id               = servicio.id;
             formularioServicio.nombre           = servicio.nombre;
             formularioServicio.precio           = servicio.precio;
-            formularioServicio.anticipo         = servicio.anticipo; // -> MAPEAR AL EDITAR
+            formularioServicio.anticipo         = servicio.anticipo || '';
+            formularioServicio.tarjeta          = servicio.tarjeta || '0'; // -> MAPEAMOS TARJETA
             formularioServicio.duracion_minutos = servicio.duracion_minutos;
         } else {
             esEditarServicio.value              = false;
@@ -183,6 +183,7 @@ export function useServicios(token) {
             formularioServicio.nombre           = '';
             formularioServicio.precio           = '';
             formularioServicio.anticipo         = '';
+            formularioServicio.tarjeta          = '0'; // Por defecto Efectivo
             formularioServicio.duracion_minutos = '';
         }
 
@@ -199,7 +200,7 @@ export function useServicios(token) {
         mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
         servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
         limiteServicios, totalServicios, formularioServicio, erroresServicio,
-        porcentajeAnticipo, anticipoMinimo, // -> EXPORTAMOS A LA UI
+        minimoAnticipoPlan, anticipoMinimo,
         serviciosFiltrados,
         abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
         cargarServiciosNegocio, guardarServicio, eliminarServicio, setAnticipoMinimo

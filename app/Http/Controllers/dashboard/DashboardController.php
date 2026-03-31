@@ -18,19 +18,25 @@ class DashboardController extends Controller
 
         Log::info('entro Dashboard ' . $idUsuario);
 
-        $usuarioLoggeado = DB::select("SELECT id_plan, email, name FROM users WHERE id = " . $idUsuario);
+        // --> CAMBIO AQUI: Hacemos LEFT JOIN con plan_usuarios para obtener el id_plan
+        $usuarioLoggeado = DB::table('users as u')
+            ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
+            ->select('pu.id_plan', 'u.email', 'u.name')
+            ->where('u.id', $idUsuario)
+            ->first();
 
         $cantidadNegocios = DB::table('negocios')->where('id_usuario', $idUsuario)->count();
+
         if($usuarioLoggeado != null){
-            if($usuarioLoggeado[0]->id_plan != null){
+            if($usuarioLoggeado->id_plan != null){
                 $globalFuncion = new GlobalFuncion();
-                $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado[0]->id_plan);
+                $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
                 $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
 
                 return response()->json([
                     'valid' => true,
                     'planAdquirido' => $planAdquirido,
-                    'usuarioLoggeado' => $usuarioLoggeado[0],
+                    'usuarioLoggeado' => $usuarioLoggeado, // <-- Ya es un objeto, no un array de objetos
                     'cantidadNegocios' => $cantidadNegocios,
                     'prioridadesTicket' => $prioridadesTicket
                 ]);
@@ -38,7 +44,7 @@ class DashboardController extends Controller
                 return response()->json([
                     'valid' => true,
                     'planAdquirido' => null,
-                    'usuarioLoggeado' => $usuarioLoggeado[0],
+                    'usuarioLoggeado' => $usuarioLoggeado,
                     'cantidadNegocios' => $cantidadNegocios
                 ]);
             }
@@ -124,9 +130,14 @@ class DashboardController extends Controller
                     ]);
                 }
 
-                DB::table('users')->where('id', Auth::id())->update([
-                    'id_plan' => $request->plan
-                ]);
+                // --> CAMBIO AQUI: ACTUALIZAR O INSERTAR EN LA NUEVA TABLA PLAN_USUARIOS
+                DB::table('plan_usuarios')->updateOrInsert(
+                    ['id_usuario' => Auth::id()],
+                    [
+                        'id_plan' => $request->plan,
+                        'updated_at' => Carbon::now()
+                    ]
+                );
 
                 return response()->json([
                     'valid' => true,
@@ -150,8 +161,20 @@ class DashboardController extends Controller
     public function misNegocios(Request $request){
         $idUsuario = Auth::id();
 
-        $usuarioLoggeado = DB::table('users')->select('name', 'email', 'id_plan')->where('id', $idUsuario)->first();
-        $planAdquirido = DB::table('planes')->where('id', $usuarioLoggeado->id_plan)->first();
+        // --> CAMBIO AQUI: Hacemos LEFT JOIN con plan_usuarios
+        $usuarioLoggeado = DB::table('users as u')
+            ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
+            ->select('u.name', 'u.email', 'pu.id_plan')
+            ->where('u.id', $idUsuario)
+            ->first();
+
+        // Validamos que el usuario y el plan existan
+        $planAdquirido = null;
+        if($usuarioLoggeado && $usuarioLoggeado->id_plan) {
+            $globalFuncion = new GlobalFuncion();
+            $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
+        }
+
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
         foreach ($negocios as $negocio) {

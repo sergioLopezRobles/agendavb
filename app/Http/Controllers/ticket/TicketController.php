@@ -39,7 +39,7 @@ class TicketController extends Controller
                 'n.nombre as negocio_nombre',
                 'p.descripcion as prioridad_nombre',
                 'e.descripcion as estado_nombre',
-                'f.pregunta as pregunta_nombre', // --> TEXTO DE LA PREGUNTA FAQ
+                'f.pregunta as pregunta_nombre',
                 DB::raw("DATE_FORMAT(t.created_at, '%d/%m/%Y') as fecha")
             )
             ->orderBy('t.created_at', 'desc')
@@ -51,7 +51,7 @@ class TicketController extends Controller
             'prioridades' => $prioridades,
             'estados' => $estados,
             'negocios' => $negocios,
-            'preguntas' => $preguntas // --> ENVIAMOS PREGUNTAS
+            'preguntas' => $preguntas
         ]);
     }
 
@@ -72,16 +72,12 @@ class TicketController extends Controller
                 $existe = DB::table('ticket_soporte_usuarios_negocios')->where('id', $idGenerado)->exists();
             } while ($existe);
 
-            // Si es diferente a "Otro" (99), guardamos el asunto vacío para ahorrar memoria.
-            // Si eligió "Otro", guardamos el texto que escribió manualmente en $request->asunto
-            $asuntoFinal = ($request->id_pregunta == 99) ? $request->asunto : '';
-
             DB::table('ticket_soporte_usuarios_negocios')->insert([
                 'id' => $idGenerado,
                 'id_usuario' => Auth::id(),
                 'id_negocio' => $request->id_negocio,
                 'id_pregunta' => $request->id_pregunta, // --> GUARDAMOS LA PREGUNTA SELECCIONADA
-                'asunto' => $asuntoFinal, // --> GUARDAMOS EL TEXTO MANUAL SI ES 99
+                'asunto' => $request->asunto, // --> GUARDAMOS EL ASUNTO QUE ENVÍA VUE
                 'id_prioridad' => null,
                 'id_estado' => '1',
                 'created_at' => Carbon::now(),

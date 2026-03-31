@@ -17,8 +17,8 @@ class NegocioController extends Controller
     public function registrarPlanNegocio(Request $request)
     {
         try {
-            // COMENTA AQUI PARA DESACTIVAR STRIPE (BACKEND)
-            /*
+            // COMENTAR PARA DESACTIVAR STRIPE (BACKEND)
+
             Stripe::setApiKey(config('services.stripe.secret'));
 
             $planStripe = DB::table('planes_stripe')->where('id_plan', $request->plan)->first();
@@ -52,19 +52,30 @@ class NegocioController extends Controller
             DB::table('suscripciones_stripe')->insert([
                 'id_usuario' => Auth::id(),
                 'nombre' => 'Plan ' . $request->plan,
-                'stripe_id' => $subscription->id,
-                'stripe_status' => $subscription->status,
-                'stripe_price' => $priceId,
+                'stripe_id' => $subscription->id ?? 'local_' . Str::random(10), // Genera un ID falso si no hay Stripe
+                'stripe_status' => $subscription->status ?? 'active',
+                'stripe_price' => $priceId ?? null,
+                'current_period_start' => !empty($subscription->current_period_start)
+                    ? Carbon::createFromTimestamp($subscription->current_period_start)
+                    : Carbon::now(),
+                'current_period_end' => !empty($subscription->current_period_end)
+                    ? Carbon::createFromTimestamp($subscription->current_period_end)
+                    : Carbon::now()->addMonth(),
                 'quantity' => 1,
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now()
             ]);
-            */
+
             // HASTA AQUI
 
-            DB::table('users')
-                ->where('id', Auth::id())
-                ->update(['id_plan' => $request->plan]);
+            // ACTUALIZAR O INSERTAR EN LA NUEVA TABLA PLAN_USUARIOS
+            DB::table('plan_usuarios')->updateOrInsert(
+                ['id_usuario' => Auth::id()],
+                [
+                    'id_plan' => $request->plan,
+                    'updated_at' => Carbon::now()
+                ]
+            );
 
             // GENERAR Y LIMPIAR EL SLUG (Evita espacios y caracteres especiales)
             $slugFinal = $request->slug ? \Illuminate\Support\Str::slug($request->slug) : null;
@@ -135,6 +146,93 @@ class NegocioController extends Controller
             return response()->json([
                 'valid' => false,
                 'message' => 'Error al procesar: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function upgradePlanStripe(Request $request)
+    {
+        try {
+            // 1. Validar que el nuevo plan exista en nuestra tabla de Stripe
+            $nuevoPlanStripe = DB::table('planes_stripe')->where('id_plan', $request->plan)->first();
+
+            if(!$nuevoPlanStripe) {
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'El plan seleccionado no está configurado correctamente.'
+                ]);
+            }
+
+            // 2. Obtener la suscripción actual del usuario
+            $suscripcionActual = DB::table('suscripciones_stripe')->where('id_usuario', Auth::id())->first();
+
+            if ($suscripcionActual) {
+                // COMENTA AQUI PARA DESACTIVAR STRIPE (BACKEND UPGRADE)
+                Stripe::setApiKey(config('services.stripe.secret'));
+
+                // Recuperamos la suscripción de Stripe
+                $subscription = Subscription::retrieve($suscripcionActual->stripe_id);
+
+                // Actualizamos el precio y le decimos que cobre la diferencia HOY (always_invoice)
+                Subscription::update($suscripcionActual->stripe_id, [
+                    'items' => [
+                        [
+                            'id' => $subscription->items->data[0]->id, // ID del item viejo
+                            'price' => $nuevoPlanStripe->stripe_price_id, // Nuevo precio
+                        ],
+                    ],
+                    'proration_behavior' => 'always_invoice',
+                ]);
+                // HASTA AQUI
+
+                // Recuperamos la suscripción actualizada de Stripe para tener la nueva fecha de corte
+                $subscriptionUpdated = Subscription::retrieve($suscripcionActual->stripe_id);
+
+                // Actualizamos nuestra base de datos local
+                DB::table('suscripciones_stripe')
+                    ->where('id_usuario', Auth::id())
+                    ->update([
+                        'nombre' => 'Plan ' . $request->plan,
+                        'stripe_price' => $nuevoPlanStripe->stripe_price_id,
+                        'current_period_start' => Carbon::createFromTimestamp($subscriptionUpdated->current_period_start),
+                        'current_period_end' => Carbon::createFromTimestamp($subscriptionUpdated->current_period_end),
+                        'updated_at' => Carbon::now()
+                    ]);
+            }
+
+            // 3. Subir de nivel al usuario en el sistema
+            DB::table('plan_usuarios')->updateOrInsert(
+                ['id_usuario' => Auth::id()],
+                [
+                    'id_plan' => $request->plan,
+                    'updated_at' => Carbon::now()
+                ]
+            );
+
+            // ==========================================
+            // --> 4. SINCRONIZAR SUS NEGOCIOS AL NUEVO PLAN
+            // ==========================================
+            DB::table('negocios')
+                ->where('id_usuario', Auth::id())
+                ->update([
+                    'id_plan' => $request->plan,
+                    'updated_at' => Carbon::now()
+                ]);
+
+            return response()->json([
+                'valid' => true,
+                'message' => '¡Plan actualizado con éxito!'
+            ]);
+
+        } catch (\Stripe\Exception\CardException $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'El cobro del nuevo plan fue rechazado: ' . $e->getError()->message
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Error al procesar el cambio de plan: ' . $e->getMessage()
             ], 500);
         }
     }

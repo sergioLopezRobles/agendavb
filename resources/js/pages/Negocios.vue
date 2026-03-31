@@ -1,9 +1,20 @@
 <script setup>
+/**
+ * Componente de página para la gestión de Negocios.
+ *
+ * Permite a los usuarios ver, crear, editar y gestionar sus negocios,
+ * así como los servicios asociados a cada uno. También incluye
+ * funcionalidades para generar códigos QR, copiar enlaces públicos y
+ * gestionar planes de suscripción.
+ */
 import { onMounted, ref } from 'vue';
+import QrcodeVue from 'qrcode.vue';
+
+// Componentes
 import Layout   from '../componentes/Layout.vue';
 import PlanCard from '../componentes/PlanCard.vue';
-import QrcodeVue from 'qrcode.vue'; // --> IMPORTAMOS LA LIBRERÍA DE QR
 
+// Composables
 import { useNegocios  } from '../composables/useNegocios.js';
 import { useServicios } from '../composables/useServicios.js';
 
@@ -26,7 +37,7 @@ const {
     mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
     servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
     limiteServicios, totalServicios, formularioServicio, erroresServicio,
-    serviciosFiltrados, porcentajeAnticipo, anticipoMinimo, setAnticipoMinimo,
+    serviciosFiltrados, minimoAnticipoPlan, anticipoMinimo, setAnticipoMinimo,
     abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
     guardarServicio, eliminarServicio
 } = useServicios(token);
@@ -97,6 +108,9 @@ onMounted(() => {
 <template>
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                        HEADER DE LA PÁGINA                        -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Gestión de Negocios</h4>
@@ -110,6 +124,9 @@ onMounted(() => {
             </button>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                        TABLA DE NEGOCIOS                          -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -160,6 +177,10 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                           MODAL: CÓDIGO QR                        -->
+        <!--      Se muestra al hacer clic en el botón de QR de un negocio     -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalQR" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-sm">
                 <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
@@ -184,6 +205,10 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                      MODAL: EDICIÓN DE NEGOCIO                    -->
+        <!--   Se muestra al hacer clic en el botón de editar de un negocio    -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalEdicion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -247,6 +272,10 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                     MODAL: CREACIÓN DE NEGOCIO                    -->
+        <!--      Se muestra al hacer clic en el botón "Añadir Negocio"        -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalCreacion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -329,6 +358,10 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                   MODAL: UPGRADE DE PLAN                          -->
+        <!-- Se muestra cuando el usuario intenta acceder a una función premium -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalUpgrade" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); backdrop-filter: blur(5px);">
             <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content border-0 shadow-lg rounded-4 bg-light">
@@ -352,6 +385,10 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--                   MODAL: GESTIÓN DE SERVICIOS                     -->
+        <!-- Se muestra al hacer clic en el botón de servicios de un negocio   -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalServicios" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -387,6 +424,7 @@ onMounted(() => {
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Nombre</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Precio Total</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Anticipo Fijo</th>
+                                    <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Método</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Duración</th>
                                     <th class="py-3 px-3 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                                 </tr>
@@ -395,7 +433,13 @@ onMounted(() => {
                                 <tr v-for="servicio in serviciosFiltrados" :key="servicio.id">
                                     <td class="px-3 py-3 fw-bold text-dark">{{ servicio.nombre }}</td>
                                     <td class="px-3 py-3 text-success fw-bold">${{ servicio.precio }}</td>
-                                    <td class="px-3 py-3 text-primary fw-bold">${{ servicio.anticipo }}</td>
+                                    <td class="px-3 py-3 text-primary fw-bold">
+                                        {{ servicio.anticipo ? '$' + servicio.anticipo : '(Sin anticipo)' }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span v-if="servicio.tarjeta == '1'" class="badge bg-primary bg-opacity-10 text-primary rounded-pill">💳 Tarjeta</span>
+                                        <span v-else class="badge bg-success bg-opacity-10 text-success rounded-pill">💵 Efectivo</span>
+                                    </td>
                                     <td class="px-3 py-3 text-muted">{{ servicio.duracion_minutos }} min</td>
                                     <td class="px-3 py-3 text-end">
                                         <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary p-2 me-2">Editar</button>
@@ -403,7 +447,7 @@ onMounted(() => {
                                     </td>
                                 </tr>
                                 <tr v-if="serviciosFiltrados.length === 0">
-                                    <td colspan="5" class="text-center py-4 text-muted">No se encontraron servicios.</td>
+                                    <td colspan="6" class="text-center py-4 text-muted">No se encontraron servicios.</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -413,6 +457,11 @@ onMounted(() => {
             </div>
         </div>
 
+        <!-- ───────────────────────────────────────────────────────────────── -->
+        <!--               MODAL: FORMULARIO DE CREAR/EDITAR SERVICIO          -->
+        <!-- Se muestra desde el modal de "Gestión de Servicios" al añadir o   -->
+        <!-- editar un servicio.                                               -->
+        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalFormServicio" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6);">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -426,6 +475,19 @@ onMounted(() => {
                             <input type="text" v-model="formularioServicio.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.nombre }">
                             <div class="invalid-feedback fw-medium">{{ erroresServicio.nombre }}</div>
                         </div>
+
+                        <div class="mb-4 bg-light p-3 rounded-3 border d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark">Método de Pago Permitido</h6>
+                                <small class="text-muted">Elige cómo cobrarás este servicio.</small>
+                            </div>
+                            <div class="form-check form-switch fs-4 mb-0">
+                                <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="switchTarjeta"
+                                       :checked="formularioServicio.tarjeta === '1'"
+                                       @change="formularioServicio.tarjeta = $event.target.checked ? '1' : '0'">
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Precio Total</label>
@@ -435,18 +497,24 @@ onMounted(() => {
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.precio }}</div>
                                 </div>
                             </div>
+
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
                                     <span>Pago de Anticipo</span>
-                                    <span v-if="formularioServicio.precio" class="badge bg-primary text-white cursor-pointer" @click="setAnticipoMinimo" style="cursor: pointer;" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
+                                    <span v-if="formularioServicio.precio && formularioServicio.tarjeta === '1'" class="badge bg-primary text-white cursor-pointer" @click="setAnticipoMinimo" style="cursor: pointer;" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-0">$</span>
-                                    <input type="number" step="0.01" v-model="formularioServicio.anticipo" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.anticipo }" placeholder="Ej. 100.00">
+                                    <input type="number" step="0.01" v-model="formularioServicio.anticipo"
+                                           class="form-control form-control-lg bg-light border-0 shadow-sm"
+                                           :class="{ 'is-invalid': erroresServicio.anticipo }"
+                                           placeholder="Dejar en 0 si no requiere"
+                                           :disabled="formularioServicio.tarjeta === '0'">
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.anticipo }}</div>
                                 </div>
-                                <small class="text-muted d-block mt-1">El cliente deberá abonar esto al agendar.</small>
+                                <small class="text-muted d-block mt-1">Opcional. Se guardará como sin anticipo si es 0.</small>
                             </div>
+
                             <div class="col-md-12 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Duración de la cita</label>
                                 <div class="input-group">
@@ -471,6 +539,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/*
+ * Estilos para el efecto hover en el "pill" del enlace copiable.
+ */
 .copy-pill {
     cursor: pointer;
     transition: all 0.2s ease-in-out;

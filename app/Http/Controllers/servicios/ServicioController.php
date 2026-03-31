@@ -40,19 +40,19 @@ class ServicioController extends Controller
                 ->first();
             $limiteServicios = $limiteServiciosRow ? $limiteServiciosRow->valor : null;
 
-            // OBTENER PORCENTAJE DE ANTICIPO DEL PLAN
+            // OBTENER ANTICIPO FIJO DEL PLAN
             $anticipoRow = DB::table('caracteristicasplanes')
                 ->where('id_plan', $negocio->id_plan)
                 ->where('titulo', 'anticipo_forzoso')
                 ->first();
-            $porcentajeAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
+            $minimoAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
 
             return response()->json([
                 'valid'               => true,
                 'servicios'           => $servicios,
                 'minutos_permitidos'  => $minutosPermitidos,
                 'limite_servicios'    => $limiteServicios,
-                'porcentaje_anticipo' => $porcentajeAnticipo,
+                'minimo_anticipo'     => $minimoAnticipo, // -> CAMBIÓ EL NOMBRE DE LA VARIABLE
                 'total_servicios'     => $servicios->count()
             ]);
 
@@ -100,7 +100,8 @@ class ServicioController extends Controller
                 'id_negocio'       => $request->id_negocio,
                 'nombre'           => $request->nombre,
                 'precio'           => $request->precio,
-                'anticipo'         => $request->anticipo, // -> NUEVO CAMPO
+                'anticipo'         => $request->anticipo,
+                'tarjeta'          => $request->tarjeta, // -> NUEVO CAMPO
                 'duracion_minutos' => $request->duracion_minutos,
                 'created_at'       => Carbon::now(),
                 'updated_at'       => Carbon::now()
@@ -142,7 +143,8 @@ class ServicioController extends Controller
                 ->update([
                     'nombre'           => $request->nombre,
                     'precio'           => $request->precio,
-                    'anticipo'         => $request->anticipo, // -> NUEVO CAMPO
+                    'anticipo'         => $request->anticipo,
+                    'tarjeta'          => $request->tarjeta, // -> NUEVO CAMPO
                     'duracion_minutos' => $request->duracion_minutos,
                     'updated_at'       => Carbon::now()
                 ]);
