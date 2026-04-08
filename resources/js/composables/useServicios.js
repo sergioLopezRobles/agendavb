@@ -10,10 +10,13 @@ export function useServicios(token) {
     const minutosDisponibles       = ref([]);
     const limiteServicios          = ref(null);
     const totalServicios           = ref(0);
-    const minimoAnticipoPlan       = ref(0); // -> AHORA ES UN VALOR FIJO (10, 25, 50)
+    const minimoAnticipoPlan       = ref(0);
+    const minimoCancelacionPlan    = ref(0); // -> NUEVO: Minutos de cancelación del plan
 
-    // -> AGREGAMOS 'tarjeta' AL FORMULARIO
-    const formularioServicio = reactive({ id: '', nombre: '', precio: '', anticipo: '', tarjeta: '0', duracion_minutos: '' });
+    // -> AGREGAMOS 'notas' y 'minutos_cancelacion' AL FORMULARIO
+    const formularioServicio = reactive({ id: '', nombre: '', precio: '',
+        anticipo: '', tarjeta: '0', duracion_minutos: '', notas: '', minutos_cancelacion: '' });
+
     const erroresServicio    = reactive({});
 
     const serviciosFiltrados = computed(() => {
@@ -23,9 +26,13 @@ export function useServicios(token) {
         );
     });
 
-    // -> EL ANTICIPO MÍNIMO AHORA ES DIRECTAMENTE EL VALOR DEL PLAN
     const anticipoMinimo = computed(() => {
         return Number(minimoAnticipoPlan.value);
+    });
+
+    // -> COMPUTED PARA SABER SI EL PLAN PERMITE NOTAS (Plan 2 y 3)
+    const permiteNotas = computed(() => {
+        return negocioActualServicios.value?.id_plan == 2 || negocioActualServicios.value?.id_plan == 3;
     });
 
     const authHeaders = () => ({
@@ -49,11 +56,12 @@ export function useServicios(token) {
             const data = await res.json();
 
             if (data.valid) {
-                servicios.value          = data.servicios;
-                minutosDisponibles.value = data.minutos_permitidos;
-                limiteServicios.value    = data.limite_servicios;
-                totalServicios.value     = data.total_servicios;
-                minimoAnticipoPlan.value = data.minimo_anticipo; // -> GUARDAMOS EL MÍNIMO FIJO
+                servicios.value             = data.servicios;
+                minutosDisponibles.value    = data.minutos_permitidos;
+                limiteServicios.value       = data.limite_servicios;
+                totalServicios.value        = data.total_servicios;
+                minimoAnticipoPlan.value    = data.minimo_anticipo;
+                minimoCancelacionPlan.value = data.minimo_cancelacion; // -> GUARDAMOS LOS MINUTOS DE CANCELACIÓN
             }
         } catch {
             window.$toast.show('Error al cargar servicios', 'danger', 3000);
@@ -81,7 +89,6 @@ export function useServicios(token) {
         const precioTotal = Number(formularioServicio.precio);
         const anticipoIngresado = Number(formularioServicio.anticipo) || 0;
 
-        // Si el cobro por tarjeta está activo, EXIGIMOS el mínimo (no se permite 0 ni vacío)
         if (formularioServicio.tarjeta === '1') {
             if (anticipoIngresado < anticipoMinimo.value) {
                 erroresServicio.anticipo = `Al cobrar con tarjeta, el anticipo mínimo debe ser de $${anticipoMinimo.value.toFixed(2)}`;
@@ -89,15 +96,31 @@ export function useServicios(token) {
             }
         }
 
-        // No puede ser mayor al precio del servicio
         if (anticipoIngresado > precioTotal) {
             erroresServicio.anticipo = 'El anticipo no puede ser mayor al costo total del servicio.';
             esValido = false;
         }
 
+        // -> VALIDACIÓN ESTRICTA: MINUTOS DE CANCELACIÓN POR PLAN
+        // Si la BD devuelve null (Avanzado), minCancelacion será 0.
+        const minCancelacion = Number(minimoCancelacionPlan.value) || 0;
+        const inputCancelacion = formularioServicio.minutos_cancelacion === '' ? -1 : Number(formularioServicio.minutos_cancelacion);
+
+        if (minCancelacion > 0) {
+            // Planes Básico (60) y Medio (15)
+            if (inputCancelacion < minCancelacion) {
+                erroresServicio.minutos_cancelacion = `Tu plan requiere un mínimo de ${minCancelacion} minutos de anticipación.`;
+                esValido = false;
+            }
+        } else {
+            // Plan Avanzado (null / 0) - Sin límite, pero no puede ser negativo
+            if (inputCancelacion < 0) {
+                formularioServicio.minutos_cancelacion = 0;
+            }
+        }
+
         if (!esValido) return;
 
-        // -> PREPARAR EL PAYLOAD (Convertir a nulo si es Efectivo y dejaron 0)
         let anticipoFinal = anticipoIngresado > 0 ? anticipoIngresado : null;
 
         try {
@@ -108,12 +131,14 @@ export function useServicios(token) {
                 method,
                 headers: authHeaders(),
                 body: JSON.stringify({
-                    id_negocio:        negocioActualServicios.value.id,
-                    nombre:            formularioServicio.nombre,
-                    precio:            formularioServicio.precio,
-                    anticipo:          anticipoFinal, // Se va nulo si es 0
-                    tarjeta:           formularioServicio.tarjeta, // '1' o '0'
-                    duracion_minutos:  formularioServicio.duracion_minutos
+                    id_negocio:          negocioActualServicios.value.id,
+                    nombre:              formularioServicio.nombre,
+                    precio:              formularioServicio.precio,
+                    anticipo:            anticipoFinal,
+                    tarjeta:             formularioServicio.tarjeta,
+                    duracion_minutos:    formularioServicio.duracion_minutos,
+                    notas:               permiteNotas.value ? formularioServicio.notas : null,
+                    minutos_cancelacion: formularioServicio.minutos_cancelacion === '' ? 0 : formularioServicio.minutos_cancelacion
                 })
             });
             const data = await res.json();
@@ -175,16 +200,20 @@ export function useServicios(token) {
             formularioServicio.nombre           = servicio.nombre;
             formularioServicio.precio           = servicio.precio;
             formularioServicio.anticipo         = servicio.anticipo || '';
-            formularioServicio.tarjeta          = servicio.tarjeta || '0'; // -> MAPEAMOS TARJETA
+            formularioServicio.tarjeta          = servicio.tarjeta || '0';
             formularioServicio.duracion_minutos = servicio.duracion_minutos;
+            formularioServicio.notas            = servicio.notas || '';
+            formularioServicio.minutos_cancelacion = servicio.minutos_cancelacion; // -> CARGAR
         } else {
             esEditarServicio.value              = false;
             formularioServicio.id               = '';
             formularioServicio.nombre           = '';
             formularioServicio.precio           = '';
-            formularioServicio.anticipo         = '';
-            formularioServicio.tarjeta          = '0'; // Por defecto Efectivo
+            formularioServicio.tarjeta          = '1';
+            formularioServicio.anticipo         = anticipoMinimo.value.toFixed(2);
             formularioServicio.duracion_minutos = '';
+            formularioServicio.notas            = '';
+            formularioServicio.minutos_cancelacion = minimoCancelacionPlan.value || 0; // -> VALOR POR DEFECTO DEL PLAN
         }
 
         mostrarModalServicios.value    = false;
@@ -200,8 +229,8 @@ export function useServicios(token) {
         mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
         servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
         limiteServicios, totalServicios, formularioServicio, erroresServicio,
-        minimoAnticipoPlan, anticipoMinimo,
-        serviciosFiltrados,
+        minimoAnticipoPlan, anticipoMinimo, minimoCancelacionPlan,
+        serviciosFiltrados, permiteNotas,
         abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
         cargarServiciosNegocio, guardarServicio, eliminarServicio, setAnticipoMinimo
     };

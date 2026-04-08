@@ -35,6 +35,7 @@ return new class extends Migration
             ['id_plan' => '1', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '200'],
             ['id_plan' => '1', 'titulo' => 'limite_telefonos_negocios', 'valor' => '3'],
             ['id_plan' => '1', 'titulo' => 'anticipo_forzoso', 'valor' => '50'],
+            ['id_plan' => '1', 'titulo' => 'minimo_minutos_cancelacion_servicio', 'valor' => '60'],
 
             // --- PLAN MEDIO (2) ---
             ['id_plan' => '2', 'titulo' => 'precio', 'valor' => '200'],
@@ -49,6 +50,7 @@ return new class extends Migration
             ['id_plan' => '2', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '200'],
             ['id_plan' => '2', 'titulo' => 'limite_telefonos_negocios', 'valor' => '5'],
             ['id_plan' => '2', 'titulo' => 'anticipo_forzoso', 'valor' => '25'],
+            ['id_plan' => '2', 'titulo' => 'minimo_minutos_cancelacion_servicio', 'valor' => '15'],
 
             // --- PLAN AVANZADO (3) ---
             ['id_plan' => '3', 'titulo' => 'precio', 'valor' => '500'],
@@ -63,6 +65,7 @@ return new class extends Migration
             ['id_plan' => '3', 'titulo' => 'whatsapp_creditos_iniciales', 'valor' => '500'],
             ['id_plan' => '3', 'titulo' => 'limite_telefonos_negocios', 'valor' => '10'],
             ['id_plan' => '3', 'titulo' => 'anticipo_forzoso', 'valor' => '10'],
+            ['id_plan' => '3', 'titulo' => 'minimo_minutos_cancelacion_servicio', 'valor' => null],
         ]);
     }
 

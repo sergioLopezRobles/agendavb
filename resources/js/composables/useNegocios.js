@@ -13,9 +13,12 @@ export function useNegocios() {
     const mostrarModalEdicion  = ref(false);
     const mostrarModalCreacion = ref(false);
 
-    const negocioEditando = ref({ id: '', nombre: '', email: '', slug: '', telefonos: [] });
-    const nuevoNegocio    = ref({ nombre: '', email: '', slug: '', telefonos: [{ id_tipo: 1, numero: '' }] });
-
+    const negocioEditando = ref({ id: '', nombre: '', email: '', slug: '', direccion: '', logoActual: '', logoNuevo: null, logoPreview: '', telefonos: [] });
+    const nuevoNegocio = ref({
+        nombre: '', email: '', slug: '', direccion: '',
+        logo: null, logoPreview: '', // <-- AGREGADO
+        telefonos: [{ id_tipo: 1, numero: '' }]
+    });
     const errores = reactive({});
 
     const horariosDisponibles = [
@@ -42,6 +45,26 @@ export function useNegocios() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     });
+
+    const manejarLogoNuevo = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            nuevoNegocio.value.logo = file;
+            nuevoNegocio.value.logoPreview = URL.createObjectURL(file);
+        } else {
+            nuevoNegocio.value.logo = null;
+            nuevoNegocio.value.logoPreview = '';
+        }
+    };
+
+    const manejarLogoEdicion = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            negocioEditando.value.logoNuevo = file;
+            // Crear URL temporal para la vista previa
+            negocioEditando.value.logoPreview = URL.createObjectURL(file);
+        }
+    };
 
     // ── HORARIOS ──────────────────────────────────────────────────────────────
 
@@ -122,7 +145,6 @@ export function useNegocios() {
     };
 
     // ── MODAL CREACIÓN ────────────────────────────────────────────────────────
-
     const clickAgregarNegocio = () => {
         if (negocios.value.length >= limiteNegocios.value) {
             mostrarModalUpgrade.value = true;
@@ -130,10 +152,7 @@ export function useNegocios() {
         }
 
         nuevoNegocio.value = {
-            nombre: '',
-            email: usuarioLoggeado.value?.email || '',
-            slug: '',
-            telefonos: [{ id_tipo: 1, numero: '' }]
+            nombre: '', email: usuarioLoggeado.value?.email || '', slug: '', direccion: '', logo: null, logoPreview: '', telefonos: [{ id_tipo: 1, numero: '' }]
         };
         horarios.value = [];
         limpiarErrores();
@@ -172,17 +191,35 @@ export function useNegocios() {
         }
 
         try {
-            const res  = await fetch('/api/registrar-plan-negocio', {
+            const formData = new FormData();
+            formData.append('plan', planAdquirido.value.id);
+            formData.append('nombre', nuevoNegocio.value.nombre);
+            formData.append('email', nuevoNegocio.value.email);
+            formData.append('slug', nuevoNegocio.value.slug);
+
+            if (nuevoNegocio.value.direccion) {
+                formData.append('direccion', nuevoNegocio.value.direccion);
+            }
+            if (nuevoNegocio.value.logo) {
+                formData.append('logo', nuevoNegocio.value.logo);
+            }
+
+            nuevoNegocio.value.telefonos.forEach((tel, index) => {
+                formData.append(`telefonos[${index}][id_tipo]`, tel.id_tipo);
+                formData.append(`telefonos[${index}][numero]`, tel.numero);
+            });
+
+            horarios.value.forEach((hora, index) => {
+                formData.append(`horarios[${index}]`, hora);
+            });
+
+            const headersUpload = authHeaders();
+            delete headersUpload['Content-Type']; // Permite al navegador generar el boundary multipart
+
+            const res  = await fetch('/api/negocios-extra', {
                 method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({
-                    plan: planAdquirido.value.id,
-                    nombre: nuevoNegocio.value.nombre,
-                    email: nuevoNegocio.value.email,
-                    telefonos: nuevoNegocio.value.telefonos,
-                    slug: nuevoNegocio.value.slug,
-                    horarios: horarios.value
-                })
+                headers: headersUpload,
+                body: formData
             });
             const data = await res.json();
 
@@ -208,12 +245,16 @@ export function useNegocios() {
             nombre: negocio.nombre,
             email: negocio.email,
             slug: negocio.slug,
+            direccion: negocio.direccion || '',
+            logoActual: negocio.logo || '', // Logo actual en BD
+            logoNuevo: null,
+            logoPreview: '', // Limpiamos la vista previa
             telefonos: negocio.telefonos?.length
                 ? JSON.parse(JSON.stringify(negocio.telefonos))
                 : [{ id_tipo: 1, numero: '' }]
         };
 
-        horariosEdicion.value    = negocio.horarios ? [...negocio.horarios] : [];
+        horariosEdicion.value = negocio.horarios ? [...negocio.horarios] : [];
         mostrarModalEdicion.value = true;
     };
 
@@ -244,14 +285,37 @@ export function useNegocios() {
         }
 
         try {
+            const formData = new FormData();
+
+            // Laravel usa PUT, pero en peticiones multipart/form-data a veces falla.
+            // La convención en Laravel es mandar POST y agregar _method='PUT'
+            formData.append('_method', 'PUT');
+            formData.append('nombre', negocioEditando.value.nombre);
+
+            // Siempre mandamos la dirección, aunque esté vacía, para que el backend la limpie si la borran
+            formData.append('direccion', negocioEditando.value.direccion || '');
+
+            if (negocioEditando.value.logoNuevo) {
+                formData.append('logo', negocioEditando.value.logoNuevo);
+            }
+
+            negocioEditando.value.telefonos.forEach((tel, index) => {
+                formData.append(`telefonos[${index}][id_tipo]`, tel.id_tipo);
+                formData.append(`telefonos[${index}][numero]`, tel.numero);
+            });
+
+            horariosEdicion.value.forEach((hora, index) => {
+                formData.append(`horarios[${index}]`, hora);
+            });
+
+            const headersUpload = authHeaders();
+            delete headersUpload['Content-Type']; // Permite FormData
+
+            // IMPORTANTE: Cambiamos a POST por el tema de FormData + PUT en Laravel
             const res  = await fetch(`/api/negocios/${negocioEditando.value.id}`, {
-                method: 'PUT',
-                headers: authHeaders(),
-                body: JSON.stringify({
-                    nombre: negocioEditando.value.nombre,
-                    telefonos: negocioEditando.value.telefonos,
-                    horarios: horariosEdicion.value
-                })
+                method: 'POST',
+                headers: headersUpload,
+                body: formData
             });
             const data = await res.json();
 
@@ -259,6 +323,8 @@ export function useNegocios() {
                 window.$toast.show(data.message, 'success', 4000);
                 mostrarModalEdicion.value = false;
                 await cargarNegocios();
+            } else {
+                window.$toast.show(data.message || 'Error de validación', 'warning', 4000);
             }
         } catch {
             window.$toast.show('Error al guardar los cambios', 'danger', 4000);
@@ -279,6 +345,8 @@ export function useNegocios() {
         abrirModalEdicion, guardarEdicion,
         toggleHorario, toggleHorarioEdicion,
         agregarTelefonoNuevo, quitarTelefonoNuevo,
-        agregarTelefonoEdicion, quitarTelefonoEdicion
+        agregarTelefonoEdicion, quitarTelefonoEdicion,
+        manejarLogoNuevo,
+        manejarLogoEdicion
     };
 }

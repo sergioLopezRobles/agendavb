@@ -93,13 +93,13 @@ class CitasClientesController extends Controller
                 $idNegocio = $negocio->id;
 
                 // 2. CREAMOS Y GUARDAMOS EL PRIMER MOVIMIENTO (SIEMPRE SE GUARDA)
-                $globalFuncion->guardarMovimientoCliente($idNegocio, "Se agendo cita el {$fechaFormateada}, a las {$hora}, cliente: {$correo} y {$telefono}");
+                //$globalFuncion->guardarMovimientoCliente($idNegocio, "Se agendo cita el {$fechaFormateada}, a las {$hora}, cliente: {$correo} y {$telefono}");
 
                 // 3. VERIFICAMOS SI HAY ANTICIPO PARA GUARDAR EL SEGUNDO MOVIMIENTO
                 // USAR EL ANTICIPO DE LA BD, NO DEL REQUEST
-                if (!empty($anticipo) && $anticipo > 0) {
-                    $globalFuncion->guardarMovimientoCliente($idNegocio, "Se agrego anticipo de {$anticipo}, cliente: {$correo} y {$telefono}");
-                }
+                //if (!empty($anticipo) && $anticipo > 0) {
+               //     $globalFuncion->guardarMovimientoCliente($idNegocio, "Se agrego anticipo de {$anticipo}, cliente: {$correo} y {$telefono}");
+                //}
 
                 // RETORNO DE CONFIRMACIÓN DE CREACIÓN
                 return response()->json([

@@ -16,9 +16,11 @@ return new class extends Migration
             $table->string('id_negocio');
             $table->string('nombre');
             $table->decimal('precio', 10, 2);
+            $table->integer('duracion_minutos');
             $table->decimal('anticipo', 10, 2)->nullable();
             $table->string('tarjeta')->default('0'); // 0 = Efectivo, 1 = Tarjeta
-            $table->integer('duracion_minutos');
+            $table->text('notas')->nullable();
+            $table->integer('minutos_cancelacion')->default(0);
             $table->timestamps();
         });
     }

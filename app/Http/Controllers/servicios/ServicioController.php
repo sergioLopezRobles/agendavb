@@ -40,19 +40,26 @@ class ServicioController extends Controller
                 ->first();
             $limiteServicios = $limiteServiciosRow ? $limiteServiciosRow->valor : null;
 
-            // OBTENER ANTICIPO FIJO DEL PLAN
             $anticipoRow = DB::table('caracteristicasplanes')
                 ->where('id_plan', $negocio->id_plan)
                 ->where('titulo', 'anticipo_forzoso')
                 ->first();
             $minimoAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
 
+            // -> NUEVO: OBTENER LOS MINUTOS DE CANCELACIÓN DEL PLAN
+            $cancelacionRow = DB::table('caracteristicasplanes')
+                ->where('id_plan', $negocio->id_plan)
+                ->where('titulo', 'minimo_minutos_cancelacion_servicio')
+                ->first();
+            $minimoCancelacion = $cancelacionRow ? $cancelacionRow->valor : 0;
+
             return response()->json([
                 'valid'               => true,
                 'servicios'           => $servicios,
                 'minutos_permitidos'  => $minutosPermitidos,
                 'limite_servicios'    => $limiteServicios,
-                'minimo_anticipo'     => $minimoAnticipo, // -> CAMBIÓ EL NOMBRE DE LA VARIABLE
+                'minimo_anticipo'     => $minimoAnticipo,
+                'minimo_cancelacion'  => $minimoCancelacion, // -> ENVIAR AL FRONTEND
                 'total_servicios'     => $servicios->count()
             ]);
 
@@ -95,16 +102,18 @@ class ServicioController extends Controller
                 }
             }
 
-            // GUARDAMOS CON EL ANTICIPO
+            // -> GUARDAMOS CON LOS NUEVOS CAMPOS NOTAS Y MINUTOS_CANCELACION
             DB::table('servicios')->insert([
-                'id_negocio'       => $request->id_negocio,
-                'nombre'           => $request->nombre,
-                'precio'           => $request->precio,
-                'anticipo'         => $request->anticipo,
-                'tarjeta'          => $request->tarjeta, // -> NUEVO CAMPO
-                'duracion_minutos' => $request->duracion_minutos,
-                'created_at'       => Carbon::now(),
-                'updated_at'       => Carbon::now()
+                'id_negocio'          => $request->id_negocio,
+                'nombre'              => $request->nombre,
+                'precio'              => $request->precio,
+                'anticipo'            => $request->anticipo,
+                'tarjeta'             => $request->tarjeta,
+                'duracion_minutos'    => $request->duracion_minutos,
+                'notas'               => $request->notas ?? null, // -> NUEVO
+                'minutos_cancelacion' => $request->minutos_cancelacion ?? 0, // -> NUEVO
+                'created_at'          => Carbon::now(),
+                'updated_at'          => Carbon::now()
             ]);
 
             return response()->json([
@@ -137,16 +146,18 @@ class ServicioController extends Controller
                 return response()->json(['valid' => false, 'message' => 'No tienes permisos']);
             }
 
-            // ACTUALIZAMOS CON EL ANTICIPO
+            // -> ACTUALIZAMOS CON LOS NUEVOS CAMPOS
             DB::table('servicios')
                 ->where('id', $id)
                 ->update([
-                    'nombre'           => $request->nombre,
-                    'precio'           => $request->precio,
-                    'anticipo'         => $request->anticipo,
-                    'tarjeta'          => $request->tarjeta, // -> NUEVO CAMPO
-                    'duracion_minutos' => $request->duracion_minutos,
-                    'updated_at'       => Carbon::now()
+                    'nombre'              => $request->nombre,
+                    'precio'              => $request->precio,
+                    'anticipo'            => $request->anticipo,
+                    'tarjeta'             => $request->tarjeta,
+                    'duracion_minutos'    => $request->duracion_minutos,
+                    'notas'               => $request->notas ?? null, // -> NUEVO
+                    'minutos_cancelacion' => $request->minutos_cancelacion ?? 0, // -> NUEVO
+                    'updated_at'          => Carbon::now()
                 ]);
 
             return response()->json([

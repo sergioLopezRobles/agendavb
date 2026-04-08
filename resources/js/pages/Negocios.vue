@@ -29,8 +29,9 @@ const {
     abrirModalEdicion, guardarEdicion,
     toggleHorario, toggleHorarioEdicion,
     agregarTelefonoNuevo, quitarTelefonoNuevo,
-    agregarTelefonoEdicion, quitarTelefonoEdicion
-} = useNegocios();
+    agregarTelefonoEdicion, quitarTelefonoEdicion,
+    manejarLogoNuevo,
+    manejarLogoEdicion, } = useNegocios();
 
 // ── SERVICIOS ─────────────────────────────────────────────────────────────────
 const {
@@ -38,6 +39,7 @@ const {
     servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
     limiteServicios, totalServicios, formularioServicio, erroresServicio,
     serviciosFiltrados, minimoAnticipoPlan, anticipoMinimo, setAnticipoMinimo,
+    permiteNotas, // <-- LÍNEA AGREGADA AQUI
     abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
     guardarServicio, eliminarServicio
 } = useServicios(token);
@@ -58,7 +60,7 @@ const copiarSlug = async (slug) => {
             window.$toast.show('Error al copiar el enlace', 'danger', 3000);
         }
     } else {
-        // Método de respaldo para HTTP (Laragon local)
+        // Metodo de respaldo para HTTP (Laragon local)
         try {
             const textArea = document.createElement("textarea");
             textArea.value = url;
@@ -108,9 +110,6 @@ onMounted(() => {
 <template>
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                        HEADER DE LA PÁGINA                        -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Gestión de Negocios</h4>
@@ -124,51 +123,56 @@ onMounted(() => {
             </button>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                        TABLA DE NEGOCIOS                          -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" style="white-space: nowrap;">
                     <thead class="bg-light">
                     <tr>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Nombre</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Negocio</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Dirección</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Enlace (Público)</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">QR</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">QR</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Correo</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Teléfonos</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Horarios</th>
-                        <th class="py-3 px-5 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Teléfonos</th>
+                        <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr v-for="negocio in negocios" :key="negocio.id">
-                        <td class="px-4 py-3 fw-bold text-dark">
-                            <span class="fs-5 me-2">🏪</span>{{ negocio.nombre }}
+                        <td class="px-4 py-3 fw-bold text-dark d-flex align-items-center border-bottom-0">
+                            <img v-if="negocio.logo" :src="'/' + negocio.logo" alt="Logo" class="rounded-circle me-3 object-fit-cover shadow-sm border" style="width: 42px; height: 42px;">
+                            <div v-else class="rounded-circle me-3 d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary fs-5 shadow-sm border border-primary border-opacity-25" style="width: 42px; height: 42px;">
+                                🏪
+                            </div>
+                            <span class="text-truncate" style="max-width: 160px;" :title="negocio.nombre">{{ negocio.nombre }}</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div @click="copiarSlug(negocio.slug)" class="d-inline-flex align-items-center bg-primary bg-opacity-10 px-3 py-1 rounded-pill text-primary fw-medium copy-pill" title="Clic para copiar enlace">
-                                <span class="me-2 fs-6">🔗</span> {{ negocio.slug }}
+                        <td class="px-4 py-3 border-bottom-0">
+                            <div class="text-truncate text-muted" style="max-width: 180px;" :title="negocio.direccion">
+                                <span v-if="negocio.direccion" class="fs-6 me-1">📍</span>
+                                {{ negocio.direccion || 'No especificada' }}
                             </div>
                         </td>
-                        <td class="px-4 py-3">
-                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2" title="Generar código QR">📱</button>
+                        <td class="px-4 py-3 border-bottom-0">
+                            <div @click="copiarSlug(negocio.slug)" class="d-inline-flex align-items-center bg-primary bg-opacity-10 px-3 py-1 rounded-pill text-primary fw-medium copy-pill" title="Clic para copiar enlace">
+                                <span class="me-2 fs-6">🔗</span> <span class="text-truncate" style="max-width: 130px;">{{ negocio.slug }}</span>
+                            </div>
                         </td>
-
-                        <td class="px-4 py-3 text-muted">{{ negocio.email }}</td>
-                        <td class="px-4 py-3 text-muted">
+                        <td class="px-4 py-3 text-center border-bottom-0">
+                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Generar código QR">📱</button>
+                        </td>
+                        <td class="px-4 py-3 text-muted border-bottom-0">
+                            <div class="text-truncate" style="max-width: 150px;" :title="negocio.email">{{ negocio.email }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-center text-muted border-bottom-0">
                             <span class="badge bg-info text-dark rounded-pill shadow-sm">{{ negocio.telefonos?.length || 0 }} Números</span>
                         </td>
-                        <td class="px-4 py-3 text-muted">
-                            <span class="badge bg-light text-secondary border">Múltiples turnos</span>
-                        </td>
-                        <td class="px-4 py-3 text-end">
-                            <button @click="abrirModalEdicion(negocio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-2" title="Editar Información">✏️</button>
-                            <button @click="intentarAccesoPremium(1) ? abrirServicios(negocio) : null" class="btn btn-sm btn-outline-success rounded-circle p-2 me-2" title="Agregar Servicios">📋</button>
+                        <td class="px-4 py-3 text-end border-bottom-0">
+                            <button @click="abrirModalEdicion(negocio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Editar Información">✏️</button>
+                            <button @click="intentarAccesoPremium(1) ? abrirServicios(negocio) : null" class="btn btn-sm btn-outline-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Agregar Servicios">📋</button>
                         </td>
                     </tr>
                     <tr v-if="negocios.length === 0">
-                        <td colspan="6" class="text-center py-5 text-muted">
+                        <td colspan="7" class="text-center py-5 text-muted">
                             Aún no tienes negocios registrados.
                         </td>
                     </tr>
@@ -177,10 +181,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                           MODAL: CÓDIGO QR                        -->
-        <!--      Se muestra al hacer clic en el botón de QR de un negocio     -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalQR" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-sm">
                 <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
@@ -205,10 +205,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                      MODAL: EDICIÓN DE NEGOCIO                    -->
-        <!--   Se muestra al hacer clic en el botón de editar de un negocio    -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalEdicion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -220,13 +216,32 @@ onMounted(() => {
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
-                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores.edicion_nombre }">
-                            <div class="invalid-feedback fw-medium">{{ errores.edicion_nombre }}</div>
+                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">URL del Negocio</label>
                             <input type="text" v-model="negocioEditando.slug" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Dirección</label>
+                                <input type="text" v-model="negocioEditando.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Actualizar Logo</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="flex-shrink-0">
+                                        <img v-if="negocioEditando.logoPreview" :src="negocioEditando.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
+                                        <img v-else-if="negocioEditando.logoActual" :src="'/' + negocioEditando.logoActual" alt="Logo Actual" class="rounded-circle object-fit-cover shadow-sm border" style="width: 48px; height: 48px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <input type="file" @change="manejarLogoEdicion" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -272,10 +287,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                     MODAL: CREACIÓN DE NEGOCIO                    -->
-        <!--      Se muestra al hacer clic en el botón "Añadir Negocio"        -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalCreacion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -291,6 +302,25 @@ onMounted(() => {
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
                             <input type="text" v-model="nuevoNegocio.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores.nombre }" placeholder="Ej. Sucursal Centro">
                             <div class="invalid-feedback fw-medium">{{ errores.nombre }}</div>
+                        </div>
+
+                        <div class="row g-3 mb-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Dirección (Opcional)</label>
+                                <input type="text" v-model="nuevoNegocio.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Logo (Opcional)</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="flex-shrink-0">
+                                        <img v-if="nuevoNegocio.logoPreview" :src="nuevoNegocio.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <input type="file" @change="manejarLogoNuevo" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -358,10 +388,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                   MODAL: UPGRADE DE PLAN                          -->
-        <!-- Se muestra cuando el usuario intenta acceder a una función premium -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalUpgrade" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.85); backdrop-filter: blur(5px);">
             <div class="modal-dialog modal-dialog-centered modal-xl">
                 <div class="modal-content border-0 shadow-lg rounded-4 bg-light">
@@ -384,11 +410,6 @@ onMounted(() => {
                 </div>
             </div>
         </div>
-
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--                   MODAL: GESTIÓN DE SERVICIOS                     -->
-        <!-- Se muestra al hacer clic en el botón de servicios de un negocio   -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalServicios" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -457,11 +478,6 @@ onMounted(() => {
             </div>
         </div>
 
-        <!-- ───────────────────────────────────────────────────────────────── -->
-        <!--               MODAL: FORMULARIO DE CREAR/EDITAR SERVICIO          -->
-        <!-- Se muestra desde el modal de "Gestión de Servicios" al añadir o   -->
-        <!-- editar un servicio.                                               -->
-        <!-- ───────────────────────────────────────────────────────────────── -->
         <div v-if="mostrarModalFormServicio" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6);">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -478,13 +494,20 @@ onMounted(() => {
 
                         <div class="mb-4 bg-light p-3 rounded-3 border d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="mb-0 fw-bold text-dark">Método de Pago Permitido</h6>
+                                <h6 class="mb-0 fw-bold text-dark">Anticipo Permitido</h6>
                                 <small class="text-muted">Elige cómo cobrarás este servicio.</small>
                             </div>
                             <div class="form-check form-switch fs-4 mb-0">
                                 <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="switchTarjeta"
                                        :checked="formularioServicio.tarjeta === '1'"
-                                       @change="formularioServicio.tarjeta = $event.target.checked ? '1' : '0'">
+                                       @change="
+                                   formularioServicio.tarjeta = $event.target.checked ? '1' : '0';
+                                   if (formularioServicio.tarjeta === '1' && !formularioServicio.anticipo) {
+                                       formularioServicio.anticipo = anticipoMinimo.toFixed(2);
+                                   } else if (formularioServicio.tarjeta === '0') {
+                                       formularioServicio.anticipo = '';
+                                   }
+                               ">
                             </div>
                         </div>
 
@@ -501,21 +524,21 @@ onMounted(() => {
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
                                     <span>Pago de Anticipo</span>
-                                    <span v-if="formularioServicio.precio && formularioServicio.tarjeta === '1'" class="badge bg-primary text-white cursor-pointer" @click="setAnticipoMinimo" style="cursor: pointer;" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
+                                    <span v-if="formularioServicio.precio && formularioServicio.tarjeta === '1'" class="badge bg-primary text-white cursor-pointer shadow-sm" @click="setAnticipoMinimo" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-0">$</span>
                                     <input type="number" step="0.01" v-model="formularioServicio.anticipo"
                                            class="form-control form-control-lg bg-light border-0 shadow-sm"
                                            :class="{ 'is-invalid': erroresServicio.anticipo }"
-                                           placeholder="Dejar en 0 si no requiere"
+                                           placeholder="0.00"
                                            :disabled="formularioServicio.tarjeta === '0'">
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.anticipo }}</div>
                                 </div>
-                                <small class="text-muted d-block mt-1">Opcional. Se guardará como sin anticipo si es 0.</small>
+                                <small class="text-muted d-block mt-1">Se exige el mínimo si cobras con tarjeta.</small>
                             </div>
 
-                            <div class="col-md-12 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Duración de la cita</label>
                                 <div class="input-group">
                                     <select v-model="formularioServicio.duracion_minutos" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.duracion }">
@@ -525,6 +548,37 @@ onMounted(() => {
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.duracion }}</div>
                                 </div>
                             </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
+                                    <span>Límite para cancelar</span>
+                                    <span v-if="Number(minimoCancelacionPlan) > 0" class="badge bg-secondary bg-opacity-10 text-secondary shadow-sm" title="Restricción de tu plan">Mín. {{ minimoCancelacionPlan }} min</span>
+                                    <span v-else class="badge bg-success bg-opacity-10 text-success shadow-sm" title="Plan Avanzado: Sin restricciones">Sin límite</span>
+                                </label>
+                                <div class="input-group">
+                                    <input type="number" v-model="formularioServicio.minutos_cancelacion"
+                                           class="form-control form-control-lg bg-light border-0 shadow-sm"
+                                           :class="{ 'is-invalid': erroresServicio.minutos_cancelacion }"
+                                           :min="Number(minimoCancelacionPlan) || 0"
+                                           placeholder="Ej. 60">
+                                    <span class="input-group-text bg-light border-0 text-muted">min</span>
+                                    <div class="invalid-feedback fw-medium">{{ erroresServicio.minutos_cancelacion }}</div>
+                                </div>
+                            </div>
+
+                            <div v-if="permiteNotas" class="col-md-12 mb-2 mt-2">
+                                <label class="form-label fw-semibold text-secondary d-flex align-items-center">
+                                    Notas y Recomendaciones
+                                    <span class="badge bg-success bg-opacity-10 text-success ms-2 shadow-sm border border-success border-opacity-25" style="font-size: 0.7rem;">Premium</span>
+                                </label>
+                                <textarea v-model="formularioServicio.notas"
+                                          class="form-control bg-light border-0 shadow-sm p-3"
+                                          rows="3"
+                                          style="resize: none;"
+                                          placeholder="- Llegar 5 minutos antes de la cita.&#10;- Cancelar con anticipación si no puede asistir."></textarea>
+                                <small class="text-muted d-block mt-1">El cliente verá estas notas al momento de agendar.</small>
+                            </div>
+
                         </div>
                         <div class="mt-4">
                             <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3 shadow-sm" @click="guardarServicio()">
