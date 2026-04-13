@@ -3,6 +3,7 @@
 namespace App\Clases;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -28,6 +29,14 @@ class GlobalFuncion
         }
 
         return $plan;
+    }
+
+    public function insertarMovimientosUsuario($movimiento, $tipomensaje)
+    {
+        $idUsuario = Auth::id();
+
+
+
     }
 
     public function obtenerAtributoPlan($idPlan, $atributo)

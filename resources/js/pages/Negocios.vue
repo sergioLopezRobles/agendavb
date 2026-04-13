@@ -1,14 +1,6 @@
 <script setup>
-/**
- * Componente de página para la gestión de Negocios.
- *
- * Permite a los usuarios ver, crear, editar y gestionar sus negocios,
- * así como los servicios asociados a cada uno. También incluye
- * funcionalidades para generar códigos QR, copiar enlaces públicos y
- * gestionar planes de suscripción.
- */
-import { onMounted, ref } from 'vue';
-import QrcodeVue from 'qrcode.vue';
+import { onMounted, ref, nextTick } from 'vue';
+import QRCode from 'qrcode'; // <-- NUEVA LIBRERÍA
 
 // Componentes
 import Layout   from '../componentes/Layout.vue';
@@ -36,22 +28,23 @@ const {
 // ── SERVICIOS ─────────────────────────────────────────────────────────────────
 const {
     mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
-    servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
+    busquedaServicio, esEditarServicio, minutosDisponibles,
     limiteServicios, totalServicios, formularioServicio, erroresServicio,
-    serviciosFiltrados, minimoAnticipoPlan, anticipoMinimo, setAnticipoMinimo,
-    permiteNotas, // <-- LÍNEA AGREGADA AQUI
+    serviciosFiltrados, anticipoMinimo, setAnticipoMinimo,
+    permiteNotas,
     abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
-    guardarServicio, eliminarServicio
+    guardarServicio, eliminarServicio, mostrarModalVistaPrevia, servicioEnVistaPrevia,
+    fechaActual, horaActual, canvasQRPreview, abrirVistaPrevia, cerrarVistaPrevia,
+    tipoTelefono, minimoCancelacionPlan, ejecutarCancelacion
 } = useServicios(token);
 
 // ── LÓGICA DE COPIAR PORTAPAPELES Y CÓDIGO QR ─────────────────────────────────
 const mostrarModalQR = ref(false);
 const negocioActualQR = ref(null);
+const canvasQR = ref(null); // Referencia al canvas del DOM
 
 const copiarSlug = async (slug) => {
     const url = `https://${slug}`;
-
-    // Si tiene HTTPS (Producción)
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(url);
@@ -60,7 +53,6 @@ const copiarSlug = async (slug) => {
             window.$toast.show('Error al copiar el enlace', 'danger', 3000);
         }
     } else {
-        // Metodo de respaldo para HTTP (Laragon local)
         try {
             const textArea = document.createElement("textarea");
             textArea.value = url;
@@ -69,10 +61,8 @@ const copiarSlug = async (slug) => {
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-
             document.execCommand('copy');
             document.body.removeChild(textArea);
-
             window.$toast.show('¡Enlace copiado al portapapeles! 📋', 'success', 3000);
         } catch (err) {
             window.$toast.show('Error al copiar el enlace', 'danger', 3000);
@@ -80,16 +70,80 @@ const copiarSlug = async (slug) => {
     }
 };
 
-const abrirModalQR = (negocio) => {
+const abrirModalQR = async (negocio) => {
     negocioActualQR.value = negocio;
     mostrarModalQR.value = true;
+
+    // Esperamos a que el modal y el canvas se rendericen en el DOM
+    await nextTick();
+    generarQRPersonalizado();
+};
+
+const generarQRPersonalizado = async () => {
+    if (!canvasQR.value || !negocioActualQR.value) return;
+
+    const canvas = canvasQR.value;
+    const ctx = canvas.getContext('2d');
+    const url = `https://${negocioActualQR.value.slug}`;
+    const size = 200;
+    const paddingBottom = 35;
+
+    // Ajustar tamaño del canvas
+    canvas.width = size;
+    canvas.height = size + paddingBottom;
+
+    try {
+        const qrDataUrl = await QRCode.toDataURL(url, {
+            errorCorrectionLevel: 'H',
+            margin: 2,
+            width: size,
+            color: { dark: '#000000', light: '#FFFFFF' }
+        });
+
+        const qrImg = new Image();
+        qrImg.onload = () => {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(qrImg, 0, 0);
+
+            // 2.TAMAÑO DEL LOGO DEL CENTRO
+            const logoSize = 60;
+            const centerX = size / 2;
+            const centerY = size / 2;
+
+            // Círculo blanco de fondo
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, logoSize / 2 + 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+
+            // Texto "VB"
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 35px Arial, sans-serif'; // Letra
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('VB', centerX, centerY + 2);
+
+            // Nombre del negocio abajo
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif'; // Letra
+            ctx.textAlign = 'center';
+
+            let nombre = negocioActualQR.value.nombre;
+            if (nombre.length > 25) nombre = nombre.substring(0, 22) + '...';
+
+            ctx.fillText(nombre, size / 2, size + 18);
+        };
+        qrImg.src = qrDataUrl;
+
+    } catch (err) {
+        console.error('Error generando QR', err);
+    }
 };
 
 const descargarQR = () => {
-    // Buscamos el canvas que genera la librería qrcode.vue
-    const canvas = document.querySelector('.qr-container canvas');
-    if (canvas) {
-        const url = canvas.toDataURL('image/png');
+    if (canvasQR.value) {
+        const url = canvasQR.value.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = url;
         link.download = `QR_${negocioActualQR.value.slug}.png`;
@@ -158,7 +212,7 @@ onMounted(() => {
                             </div>
                         </td>
                         <td class="px-4 py-3 text-center border-bottom-0">
-                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Generar código QR">📱</button>
+                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Generar código QR">⛶</button>
                         </td>
                         <td class="px-4 py-3 text-muted border-bottom-0">
                             <div class="text-truncate" style="max-width: 150px;" :title="negocio.email">{{ negocio.email }}</div>
@@ -194,8 +248,29 @@ onMounted(() => {
                         <p class="text-primary fw-bold small mt-1">{{ negocioActualQR?.nombre }}</p>
                     </div>
 
-                    <div class="qr-container bg-white p-3 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
-                        <qrcode-vue :value="`https://${negocioActualQR?.slug}`" :size="200" level="H" foreground="#000000" />
+                    <div v-if="mostrarModalQR" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button type="button" class="btn-close shadow-none" @click="mostrarModalQR = false"></button>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h5 class="fw-bolder text-dark mb-1">Tu Código QR</h5>
+                                    <p class="text-muted small mb-0">Escanea para ir a tu agenda</p>
+                                </div>
+
+                                <div class="bg-white p-2 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
+                                    <div class="bg-white p-2 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
+                                        <canvas ref="canvasQR" style="border-radius: 8px; max-width: 100%; height: auto;"></canvas>
+                                    </div>
+                                </div>
+
+                                <button @click="descargarQR" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm d-flex justify-content-center align-items-center">
+                                    <span class="fs-5 me-2">⬇️</span> Descargar PNG
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <button @click="descargarQR" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm d-flex justify-content-center align-items-center">
@@ -410,6 +485,7 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+
         <div v-if="mostrarModalServicios" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content border-0 shadow-lg rounded-4">
@@ -462,9 +538,11 @@ onMounted(() => {
                                         <span v-else class="badge bg-success bg-opacity-10 text-success rounded-pill">💵 Efectivo</span>
                                     </td>
                                     <td class="px-3 py-3 text-muted">{{ servicio.duracion_minutos }} min</td>
-                                    <td class="px-3 py-3 text-end">
-                                        <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary p-2 me-2">Editar</button>
-                                        <button @click="eliminarServicio(servicio.id)" class="btn btn-sm btn-outline-danger p-2">Borrar</button>
+                                    <td class="text-end">
+                                        <button @click="abrirVistaPrevia(servicio)" class="btn btn-sm btn-outline-info rounded-circle p-2 me-1" title="Vista Previa">👁️</button>
+
+                                        <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-1">✏️</button>
+                                        <button @click="eliminarServicio(servicio.id)" class="btn btn-sm btn-outline-danger rounded-circle p-2">🗑️</button>
                                     </td>
                                 </tr>
                                 <tr v-if="serviciosFiltrados.length === 0">
@@ -501,13 +579,13 @@ onMounted(() => {
                                 <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="switchTarjeta"
                                        :checked="formularioServicio.tarjeta === '1'"
                                        @change="
-                                   formularioServicio.tarjeta = $event.target.checked ? '1' : '0';
-                                   if (formularioServicio.tarjeta === '1' && !formularioServicio.anticipo) {
-                                       formularioServicio.anticipo = anticipoMinimo.toFixed(2);
-                                   } else if (formularioServicio.tarjeta === '0') {
-                                       formularioServicio.anticipo = '';
-                                   }
-                               ">
+                           formularioServicio.tarjeta = $event.target.checked ? '1' : '0';
+                           if (formularioServicio.tarjeta === '1' && !formularioServicio.anticipo) {
+                               formularioServicio.anticipo = anticipoMinimo.toFixed(2);
+                           } else if (formularioServicio.tarjeta === '0') {
+                               formularioServicio.anticipo = '';
+                           }
+                       ">
                             </div>
                         </div>
 
@@ -538,7 +616,7 @@ onMounted(() => {
                                 <small class="text-muted d-block mt-1">Se exige el mínimo si cobras con tarjeta.</small>
                             </div>
 
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-12 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Duración de la cita</label>
                                 <div class="input-group">
                                     <select v-model="formularioServicio.duracion_minutos" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.duracion }">
@@ -546,23 +624,6 @@ onMounted(() => {
                                         <option v-for="minuto in minutosDisponibles" :key="minuto" :value="minuto">{{ minuto }} minutos</option>
                                     </select>
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.duracion }}</div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
-                                    <span>Límite para cancelar</span>
-                                    <span v-if="Number(minimoCancelacionPlan) > 0" class="badge bg-secondary bg-opacity-10 text-secondary shadow-sm" title="Restricción de tu plan">Mín. {{ minimoCancelacionPlan }} min</span>
-                                    <span v-else class="badge bg-success bg-opacity-10 text-success shadow-sm" title="Plan Avanzado: Sin restricciones">Sin límite</span>
-                                </label>
-                                <div class="input-group">
-                                    <input type="number" v-model="formularioServicio.minutos_cancelacion"
-                                           class="form-control form-control-lg bg-light border-0 shadow-sm"
-                                           :class="{ 'is-invalid': erroresServicio.minutos_cancelacion }"
-                                           :min="Number(minimoCancelacionPlan) || 0"
-                                           placeholder="Ej. 60">
-                                    <span class="input-group-text bg-light border-0 text-muted">min</span>
-                                    <div class="invalid-feedback fw-medium">{{ erroresServicio.minutos_cancelacion }}</div>
                                 </div>
                             </div>
 
@@ -589,6 +650,119 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+
+        <div v-if="mostrarModalVistaPrevia" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: #f4f6f9;">
+
+                    <div class="bg-white border-bottom p-3 d-flex justify-content-between align-items-center relative">
+                        <div class="position-absolute top-0 start-0 w-100 bg-primary" style="height: 4px;"></div>
+
+                        <div class="d-flex align-items-center mt-1">
+                            <img src="../../images/logo-vb.jpg" alt="Vista Boreal" class="rounded shadow-sm" style="width: 32px; height: 32px; object-fit: cover;">
+                            <span class="ms-2 fw-bolder text-dark" style="letter-spacing: -0.5px; font-size: 1.1rem;">Vista Boreal <span class="text-muted fw-normal fs-6">| Confirmación de Reserva</span></span>
+                        </div>
+                        <button type="button" class="btn-close shadow-none" @click="cerrarVistaPrevia()"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <div class="bg-white rounded-4 shadow-sm border p-4">
+
+                            <div class="text-center mb-4">
+                                <p class="text-muted fw-bold mb-0" style="font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase;">Resumen de Reservación</p>
+                            </div>
+
+                            <div class="row g-4">
+
+                                <div class="col-md-6 border-end pr-4">
+
+                                    <div class="d-flex align-items-center mb-4 bg-light p-3 rounded-3 border">
+                                        <img v-if="negocioActualServicios?.logo" :src="'/' + negocioActualServicios.logo" alt="Logo Negocio" class="rounded-circle shadow-sm border object-fit-cover flex-shrink-0" style="width: 55px; height: 55px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-white text-muted border shadow-sm flex-shrink-0" style="width: 55px; height: 55px; font-size: 1.3rem;">🏪</div>
+
+                                        <div class="ms-3">
+                                            <h5 class="fw-bolder text-dark mb-0">{{ negocioActualServicios?.nombre }}</h5>
+                                            <p class="text-muted small mb-0 text-truncate" style="max-width: 250px;">{{ negocioActualServicios?.direccion || 'Dirección no especificada' }}</p>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="fw-bold text-secondary mb-3 small text-uppercase" style="letter-spacing: 0.5px;">Detalles del Servicio</h6>
+                                    <div class="bg-white">
+                                        <div class="row g-2 small">
+                                            <div class="col-5 text-muted fw-semibold">Nombre Cliente:</div>
+                                            <div class="col-7 fw-bold text-dark text-end text-truncate"> </div>
+
+                                            <div class="col-5 text-muted fw-semibold">Servicio:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ servicioEnVistaPrevia?.nombre }}</div>
+
+                                            <div class="col-5 text-muted fw-semibold">Anticipo:</div>
+                                            <div class="col-7 fw-bold text-end" :class="servicioEnVistaPrevia?.anticipo > 0 ? 'text-primary' : 'text-success'">
+                                                {{ servicioEnVistaPrevia?.anticipo > 0 ? '$' + Number(servicioEnVistaPrevia.anticipo).toFixed(2) : 'Sin anticipo' }}
+                                            </div>
+
+                                            <div class="col-5 text-muted fw-semibold">Fecha de Registro:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ fechaActual }}</div>
+
+                                            <div class="col-5 text-muted fw-semibold">Hora de Registro:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ horaActual }}</div>
+
+                                            <div class="col-12 mt-2 pt-2 border-top"></div>
+
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold mb-1">Teléfonos del Negocio:</div>
+                                                <div class="d-flex flex-wrap gap-1 justify-content-start mt-1">
+                                            <span v-for="(tel, i) in negocioActualServicios?.telefonos" :key="i" class="badge bg-light border text-dark shadow-sm" style="font-size: 0.75rem;">
+                                                {{ tipoTelefono(tel.id_tipo) }}: {{ tel.numero }}
+                                            </span>
+                                                    <span v-if="!negocioActualServicios?.telefonos?.length" class="text-muted small">No registrados</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 d-flex flex-column">
+
+                                    <div v-if="servicioEnVistaPrevia?.notas" class="mb-4 flex-grow-1">
+                                        <h6 class="fw-bold text-secondary mb-3 small text-uppercase" style="letter-spacing: 0.5px;">
+                                            Notas y Recomendaciones
+                                        </h6>
+                                        <div class="bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 p-3 text-dark small position-relative" style="white-space: pre-line; min-height: 100px;">
+                                            <span class="position-absolute top-0 end-0 me-3 mt-2 fs-5 opacity-50">📌</span>
+                                            {{ servicioEnVistaPrevia.notas }}
+                                        </div>
+                                    </div>
+
+                                    <div v-else class="mb-4 flex-grow-1 d-flex align-items-center justify-content-center border rounded-3 bg-light text-muted small px-3 py-4">
+                                        Este servicio no incluye notas adicionales.
+                                    </div>
+
+                                    <div class="text-center mt-auto pt-3 border-top">
+                                        <p class="text-muted small fw-semibold mb-2">REVISA TU CITA</p>
+
+                                        <div class="d-inline-block bg-white p-2 border rounded-4 shadow-sm hover-shadow transition-all mb-3">
+                                            <canvas ref="canvasQRPreview" style="max-width: 100%; height: auto; border-radius: 8px;"></canvas>
+                                        </div>
+
+                                        <div class="px-3">
+                                            <button @click="ejecutarCancelacion" type="button" class="btn btn-outline-danger w-100 rounded-pill py-2 fw-bold d-flex align-items-center justify-content-center transition-all hover-shadow">
+                                                <span class="me-2">🚫</span> Cancelar Reservación
+                                            </button>
+                                            <p class="text-muted mt-2 mb-0" style="font-size: 0.7rem;">
+                                                * Sujeto a política de cancelación:
+                                                <span class="fw-bold">{{ Number(minimoCancelacionPlan) > 0 ? minimoCancelacionPlan + ' min' : 'Sin límite' }}</span>
+                                            </p>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </Layout>
 </template>
 

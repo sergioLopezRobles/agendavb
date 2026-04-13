@@ -8,27 +8,26 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use App\Traits\RegistraMovimientos; // ── NUEVO
 
 class TicketController extends Controller
 {
+    use RegistraMovimientos; // ── NUEVO
+
     public function index()
     {
         $idUsuario = Auth::id();
 
-        // 1. OBTENEMOS CATALOGOS
         $prioridades = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
-        $estados = DB::table('estado_ticket_soporte_usuarios_negocios')->get();
-        $preguntas = DB::table('preguntas_frecuentes_ticket')->get(); // --> CARGAMOS PREGUNTAS
+        $estados     = DB::table('estado_ticket_soporte_usuarios_negocios')->get();
+        $preguntas   = DB::table('preguntas_frecuentes_ticket')->get();
+        $negocios    = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
-        // 2. OBTENEMOS LOS NEGOCIOS DEL USUARIO
-        $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
-
-        // 3. OBTENEMOS LOS TICKETS DE ESTE USUARIO CON JOIN PARA TRAER NOMBRES Y PREGUNTAS
         $tickets = DB::table('ticket_soporte_usuarios_negocios as t')
             ->join('negocios as n', 't.id_negocio', '=', 'n.id')
             ->leftJoin('prioridad_ticket_soporte_usuarios_negocios as p', 't.id_prioridad', '=', 'p.id')
             ->join('estado_ticket_soporte_usuarios_negocios as e', 't.id_estado', '=', 'e.id')
-            ->leftJoin('preguntas_frecuentes_ticket as f', 't.id_pregunta', '=', 'f.id') // --> JOIN PREGUNTA
+            ->leftJoin('preguntas_frecuentes_ticket as f', 't.id_pregunta', '=', 'f.id')
             ->where('t.id_usuario', $idUsuario)
             ->select(
                 't.id',
@@ -46,12 +45,12 @@ class TicketController extends Controller
             ->get();
 
         return response()->json([
-            'valid' => true,
-            'tickets' => $tickets,
+            'valid'       => true,
+            'tickets'     => $tickets,
             'prioridades' => $prioridades,
-            'estados' => $estados,
-            'negocios' => $negocios,
-            'preguntas' => $preguntas
+            'estados'     => $estados,
+            'negocios'    => $negocios,
+            'preguntas'   => $preguntas
         ]);
     }
 
@@ -73,25 +72,32 @@ class TicketController extends Controller
             } while ($existe);
 
             DB::table('ticket_soporte_usuarios_negocios')->insert([
-                'id' => $idGenerado,
-                'id_usuario' => Auth::id(),
-                'id_negocio' => $request->id_negocio,
-                'id_pregunta' => $request->id_pregunta, // --> GUARDAMOS LA PREGUNTA SELECCIONADA
-                'asunto' => $request->asunto, // --> GUARDAMOS EL ASUNTO QUE ENVÍA VUE
-                'id_prioridad' => null,
-                'id_estado' => '1',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now()
+                'id'          => $idGenerado,
+                'id_usuario'  => Auth::id(),
+                'id_negocio'  => $request->id_negocio,
+                'id_pregunta' => $request->id_pregunta,
+                'asunto'      => $request->asunto,
+                'id_prioridad'=> null,
+                'id_estado'   => '1',
+                'created_at'  => Carbon::now(),
+                'updated_at'  => Carbon::now()
+            ]);
+
+            // ── LOG: ticket creado ────────────────────────────────────────────
+            $this->guardarLog('tickets', 'crear', $idGenerado, [
+                'asunto'      => $request->asunto,
+                'id_negocio'  => $request->id_negocio,
+                'id_pregunta' => $request->id_pregunta
             ]);
 
             return response()->json([
-                'valid' => true,
+                'valid'   => true,
                 'message' => 'Ticket creado correctamente con ID: ' . $idGenerado
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
-                'valid' => false,
+                'valid'   => false,
                 'message' => 'Error al crear el ticket: ' . $e->getMessage()
             ], 500);
         }
@@ -104,18 +110,24 @@ class TicketController extends Controller
                 ->where('id', $id)
                 ->update([
                     'id_prioridad' => $request->id_prioridad,
-                    'id_estado' => $request->id_estado,
-                    'updated_at' => Carbon::now()
+                    'id_estado'    => $request->id_estado,
+                    'updated_at'   => Carbon::now()
                 ]);
 
+            // ── LOG: ticket actualizado (cambio de estado o prioridad) ────────
+            $this->guardarLog('tickets', 'editar', $id, [
+                'id_prioridad' => $request->id_prioridad,
+                'id_estado'    => $request->id_estado
+            ]);
+
             return response()->json([
-                'valid' => true,
+                'valid'   => true,
                 'message' => 'Ticket actualizado correctamente'
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
-                'valid' => false,
+                'valid'   => false,
                 'message' => 'Error al actualizar el ticket: ' . $e->getMessage()
             ], 500);
         }

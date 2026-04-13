@@ -7,10 +7,12 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
+use App\Traits\RegistraMovimientos;
 
 class AuthController extends Controller
 {
+    use RegistraMovimientos;
+
     public function register(Request $request){
         try {
             $existeCorreo = DB::select("SELECT email FROM users WHERE email = '$request->email'");
@@ -30,6 +32,10 @@ class AuthController extends Controller
             ]);
 
             $token = $user->createToken('auth_token')->plainTextToken;
+
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('usuarios', 'crear', $request->name, $request->all());
+
 
             return response()->json([
                 'valid' => true,

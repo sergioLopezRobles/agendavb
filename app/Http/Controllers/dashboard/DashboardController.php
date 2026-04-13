@@ -7,13 +7,14 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File; // <-- NECESARIO PARA BORRAR EL LOGO VIEJO
+use Illuminate\Support\Facades\File;
 use App\Clases\GlobalFuncion;
+use App\Traits\RegistraMovimientos;
 
 class DashboardController extends Controller
 {
+    use RegistraMovimientos;
+
     public function index(){
         $idUsuario = Auth::id();
 
@@ -52,13 +53,6 @@ class DashboardController extends Controller
             'valid' => false,
             'planAdquirido' => null,
         ]);
-    }
-
-    public function registrarPlanNegocio(Request $request)
-    {
-        // ... (Tu código actual de registrarPlanNegocio queda igual aquí si lo tienes en este controlador,
-        // aunque me mostraste que lo tienes también en NegocioController. Si esta ruta apunta a NegocioController,
-        // este método aquí no se usa, pero lo dejamos intacto por si acaso).
     }
 
     public function misNegocios(Request $request){
@@ -195,6 +189,9 @@ class DashboardController extends Controller
                     }
                 }
             }
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('negocios', 'editar', $request->nombre, $request->all());
+
 
             return response()->json([
                 'valid' => true,

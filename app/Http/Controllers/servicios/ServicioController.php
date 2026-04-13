@@ -7,9 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use App\Traits\RegistraMovimientos;
 
 class ServicioController extends Controller
 {
+    use RegistraMovimientos;
+
     public function obtenerServicios($idNegocio)
     {
         try {
@@ -111,10 +114,12 @@ class ServicioController extends Controller
                 'tarjeta'             => $request->tarjeta,
                 'duracion_minutos'    => $request->duracion_minutos,
                 'notas'               => $request->notas ?? null, // -> NUEVO
-                'minutos_cancelacion' => $request->minutos_cancelacion ?? 0, // -> NUEVO
                 'created_at'          => Carbon::now(),
                 'updated_at'          => Carbon::now()
             ]);
+
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('servicios', 'crear', $request->nombre, $request->all());
 
             return response()->json([
                 'valid'   => true,
@@ -146,7 +151,6 @@ class ServicioController extends Controller
                 return response()->json(['valid' => false, 'message' => 'No tienes permisos']);
             }
 
-            // -> ACTUALIZAMOS CON LOS NUEVOS CAMPOS
             DB::table('servicios')
                 ->where('id', $id)
                 ->update([
@@ -155,10 +159,12 @@ class ServicioController extends Controller
                     'anticipo'            => $request->anticipo,
                     'tarjeta'             => $request->tarjeta,
                     'duracion_minutos'    => $request->duracion_minutos,
-                    'notas'               => $request->notas ?? null, // -> NUEVO
-                    'minutos_cancelacion' => $request->minutos_cancelacion ?? 0, // -> NUEVO
+                    'notas'               => $request->notas ?? null,
                     'updated_at'          => Carbon::now()
                 ]);
+
+            // 3. REGISTRAMOS LA EDICIÓN
+            $this->guardarLog('servicios', 'editar', $request->nombre, $request->all());
 
             return response()->json([
                 'valid'   => true,
@@ -190,6 +196,9 @@ class ServicioController extends Controller
             }
 
             DB::table('servicios')->where('id', $id)->delete();
+
+            // 3. REGISTRAMOS LA ELIMINACIÓN
+            $this->guardarLog('servicios', 'eliminar', $servicio->nombre, ['id' => $id]);
 
             return response()->json([
                 'valid'   => true,
