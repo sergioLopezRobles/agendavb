@@ -1,52 +1,73 @@
 <script setup>
+/**
+ * Componente de página para la gestión de Tickets de Soporte.
+ *
+ * Permite a los usuarios (y administradores) ver, crear, filtrar y
+ * actualizar el estado de los tickets de soporte asociados a sus negocios.
+ */
 import { ref, reactive, onMounted, computed } from 'vue';
 import Layout from '../componentes/Layout.vue';
 
-// VARIABLES GLOBALES
+// ── State ──────────────────────────────────────────────────────────────────────
+
+// Estado global y de autenticación
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
 
-// DATOS TRAIDOS DE LA BASE DE DATOS
+// Datos de la API
 const tickets = ref([]);
 const prioridadesTicket = ref([]);
 const estadosTicket = ref([]);
 const misNegocios = ref([]);
-const preguntasFrecuentes = ref([]); // --> NUEVO ARREGLO PARA EL SELECT
+const preguntasFrecuentes = ref([]);
 
-// VARIABLES DE FILTROS
+const preguntasOrdenadas = computed(() => {
+    // Hacemos una copia para no afectar el estado original
+    return [...preguntasFrecuentes.value].sort((a, b) => {
+        if (a.id == 0) return 1;  // Si 'a' es 0, lo manda al final
+        if (b.id == 0) return -1; // Si 'b' es 0, lo manda al final
+        return a.id - b.id;       // Los demás los ordena normal
+    });
+});
+
+// Estado de UI y filtros
 const buscar = ref('');
 const filtroEstado = ref('');
 const filtroPrioridad = ref('');
 
-// VARIABLES DEL MODAL Y FORMULARIO
+// Estado para el modal de "Nuevo Ticket"
 const mostrarModalTicket = ref(false);
-const errores = reactive({});
-
 const formularioTicket = reactive({
     id_negocio: '',
-    id_pregunta: '', // --> NUEVO CAMPO
+    id_pregunta: '',
     asunto: ''
 });
+const errores = reactive({});
 
-// AL INICIAR LA PANTALLA
-onMounted(() => {
-    cargarDatosMenu();
-    cargarDatosTickets();
+// Estado para el modal de "Revisar Ticket"
+const mostrarModalRevisar = ref(false);
+const ticketRevisar = reactive({
+    id: '',
+    asunto: '',
+    negocio_nombre: '',
+    id_prioridad: '',
+    id_estado: ''
 });
 
-// MANTIENE EL LAYOUT FUNCIONANDO
+// ── API Calls & Data Loading ───────────────────────────────────────────────────
+
+// Carga los datos del usuario para el Layout (menú, plan, etc.)
 const cargarDatosMenu = async () => {
     try {
         const response = await fetch('/api/dashboard', {
-            method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             }
         });
         const data = await response.json();
-        if(data.valid) {
+        if (data.valid) {
             usuarioLoggeado.value = data.usuarioLoggeado;
             planAdquirido.value = data.planAdquirido;
         }
@@ -55,31 +76,31 @@ const cargarDatosMenu = async () => {
     }
 };
 
-// TRAE LOS TICKETS, NEGOCIOS Y CATALOGOS DESDE LARAVEL
+// Carga todos los datos relacionados con los tickets (tickets, catálogos, negocios del usuario)
 const cargarDatosTickets = async () => {
     try {
         const response = await fetch('/api/tickets', {
-            method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             }
         });
         const data = await response.json();
-
-        if(data.valid) {
+        if (data.valid) {
             tickets.value = data.tickets;
             prioridadesTicket.value = data.prioridades;
             estadosTicket.value = data.estados;
             misNegocios.value = data.negocios;
-            preguntasFrecuentes.value = data.preguntas; // --> GUARDAMOS LAS PREGUNTAS
+            preguntasFrecuentes.value = data.preguntas;
         }
     } catch (error) {
         window.$toast.show('Error al cargar la información de tickets', 'danger', 4000);
     }
 };
 
-// COMPUTED PARA FILTRAR EN TIEMPO REAL
+// ── Computed ───────────────────────────────────────────────────────────────────
+
+// Filtra la lista de tickets en tiempo real según los inputs de búsqueda y los selects de filtro.
 const ticketsFiltrados = computed(() => {
     return tickets.value.filter(ticket => {
         const coincideTexto = ticket.id.toLowerCase().includes(buscar.value.toLowerCase()) ||
@@ -94,7 +115,9 @@ const ticketsFiltrados = computed(() => {
     });
 });
 
-// METODOS DEL MODAL
+// ── Modal & Form Logic (Create Ticket) ────────────────────────────────────────
+
+// Abre el modal para crear un nuevo ticket, reseteando el formulario y los errores.
 const abrirModalTicket = () => {
     Object.keys(errores).forEach(key => delete errores[key]);
     formularioTicket.id_negocio = '';
@@ -103,10 +126,12 @@ const abrirModalTicket = () => {
     mostrarModalTicket.value = true;
 };
 
+// Cierra el modal de creación de ticket.
 const cerrarModalTicket = () => {
     mostrarModalTicket.value = false;
 };
 
+// Valida y envía el formulario para crear un nuevo ticket a la API.
 // GUARDAR EL NUEVO TICKET
 const guardarTicket = async () => {
     Object.keys(errores).forEach(key => delete errores[key]);
@@ -117,18 +142,30 @@ const guardarTicket = async () => {
         esValido = false;
     }
 
-    if (!formularioTicket.id_pregunta) {
+    if (formularioTicket.id_pregunta === '') {
         errores.id_pregunta = 'Debes seleccionar un tipo de problema.';
         esValido = false;
     }
 
-    // SOLO VALIDA EL TEXTBOX SI SELECCIONÓ "OTRO" (ID 0)
+    // Validación si eligió "Otro" (0)
     if (formularioTicket.id_pregunta == 0 && !formularioTicket.asunto.trim()) {
         errores.asunto = 'Por favor, describe tu problema detalladamente.';
         esValido = false;
     }
 
     if (!esValido) return;
+
+    // ---> SOLUCIÓN: PREPARAR UN PAYLOAD SEGURO <---
+    let asuntoFinal = formularioTicket.asunto;
+
+    // Si NO eligió "Otro", le inyectamos el texto de la pregunta seleccionada
+    if (formularioTicket.id_pregunta != 0) {
+        // Usamos == para evitar problemas de tipos (String vs Number)
+        const preguntaSeleccionada = preguntasOrdenadas.value.find(p => p.id == formularioTicket.id_pregunta);
+        asuntoFinal = preguntaSeleccionada ? preguntaSeleccionada.pregunta : 'Soporte General';
+    }
+
+    console.log("Enviando a Laravel -> Pregunta ID:", formularioTicket.id_pregunta, "| Asunto Final:", asuntoFinal);
 
     try {
         const response = await fetch('/api/tickets', {
@@ -137,7 +174,11 @@ const guardarTicket = async () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify(formularioTicket)
+            body: JSON.stringify({
+                id_negocio: formularioTicket.id_negocio,
+                id_pregunta: formularioTicket.id_pregunta,
+                asunto: asuntoFinal
+            })
         });
 
         const data = await response.json();
@@ -154,30 +195,24 @@ const guardarTicket = async () => {
     }
 };
 
+// ── Modal & Form Logic (Review Ticket) ────────────────────────────────────────
+
+// Abre el modal para revisar/actualizar un ticket existente.
 const verTicket = (ticket) => {
     ticketRevisar.id = ticket.id;
-    // Si eligió una pregunta del catálogo, muestra eso en la revisión. Si eligió "Otro", muestra su texto manual.
-    ticketRevisar.asunto = ticket.id_pregunta == 0 ? ticket.asunto : ticket.pregunta_nombre;
+    ticketRevisar.asunto = (ticket.id_pregunta == 0) ? ticket.asunto : ticket.pregunta_nombre;
     ticketRevisar.negocio_nombre = ticket.negocio_nombre;
     ticketRevisar.id_prioridad = ticket.id_prioridad || '';
     ticketRevisar.id_estado = ticket.id_estado;
-
     mostrarModalRevisar.value = true;
 };
 
+// Cierra el modal de revisión de ticket.
 const cerrarModalRevisar = () => {
     mostrarModalRevisar.value = false;
 };
 
-const mostrarModalRevisar = ref(false);
-const ticketRevisar = reactive({
-    id: '',
-    asunto: '',
-    negocio_nombre: '',
-    id_prioridad: '',
-    id_estado: ''
-});
-
+// Envía los cambios de estado y prioridad de un ticket a la API.
 const actualizarTicket = async () => {
     if (!ticketRevisar.id_prioridad || !ticketRevisar.id_estado) {
         window.$toast.show('Debes seleccionar prioridad y estado', 'warning', 3000);
@@ -198,8 +233,7 @@ const actualizarTicket = async () => {
         });
 
         const data = await response.json();
-
-        if(data.valid) {
+        if (data.valid) {
             window.$toast.show(data.message, 'success', 4000);
             cerrarModalRevisar();
             cargarDatosTickets();
@@ -210,11 +244,18 @@ const actualizarTicket = async () => {
         window.$toast.show('Error al actualizar el ticket', 'danger', 4000);
     }
 };
+
+// ── Lifecycle Hooks ───────────────────────────────────────────────────────────
+
+// Al montar el componente, se cargan los datos iniciales.
+onMounted(() => {
+    cargarDatosMenu();
+    cargarDatosTickets();
+});
 </script>
 
 <template>
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
-
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Centro de Soporte</h4>
@@ -261,7 +302,6 @@ const actualizarTicket = async () => {
         </div>
 
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-
             <div class="card-header bg-white border-bottom-0 pt-4 pb-0 px-4">
                 <div class="row">
                     <div class="col-md-4">
@@ -305,7 +345,7 @@ const actualizarTicket = async () => {
                             <td class="px-4 py-3 fw-bold text-primary">{{ ticket.id }}</td>
                             <td class="px-4 py-3">
                                 <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">
-                                    {{ ticket.id_pregunta == 0 ? ticket.asunto : ticket.pregunta_nombre }}
+                                    {{ (ticket.id_pregunta == 0) ? ticket.asunto : ticket.pregunta_nombre }}
                                 </div>
                                 <div class="text-muted small">🏢 {{ ticket.negocio_nombre }}</div>
                             </td>
@@ -344,13 +384,11 @@ const actualizarTicket = async () => {
                     </table>
                 </div>
             </div>
-
         </div>
 
         <div v-if="mostrarModalTicket" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
-
                     <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
                         <h5 class="modal-title fw-bold text-dark">🎧 Nuevo Ticket de Soporte</h5>
                         <button type="button" class="btn-close shadow-none" @click="cerrarModalTicket"></button>
@@ -372,14 +410,14 @@ const actualizarTicket = async () => {
                             <label class="form-label fw-semibold text-secondary">¿Cuál es el problema?</label>
                             <select v-model="formularioTicket.id_pregunta" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_pregunta}">
                                 <option value="" disabled>Selecciona una opción...</option>
-                                <option v-for="pregunta in preguntasFrecuentes" :key="pregunta.id" :value="pregunta.id">
+                                <option v-for="pregunta in preguntasOrdenadas" :key="pregunta.id" :value="pregunta.id">
                                     {{ pregunta.pregunta }}
                                 </option>
                             </select>
                             <div class="invalid-feedback fw-medium">{{ errores.id_pregunta }}</div>
                         </div>
 
-                        <div class="mb-3" v-if="formularioTicket.id_pregunta == 0">
+                        <div class="mb-3" v-if="formularioTicket.id_pregunta == 0 && formularioTicket.id_pregunta !== ''">
                             <label class="form-label fw-semibold text-secondary">Describe tu problema detalladamente</label>
                             <textarea v-model="formularioTicket.asunto" rows="3" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Explícanos qué sucede..." :class="{'is-invalid': errores.asunto}"></textarea>
                             <div class="invalid-feedback fw-medium">{{ errores.asunto }}</div>
@@ -396,7 +434,6 @@ const actualizarTicket = async () => {
         <div v-if="mostrarModalRevisar" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
-
                     <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
                         <h5 class="modal-title fw-bold text-dark">Revisar Ticket {{ ticketRevisar.id }}</h5>
                         <button type="button" class="btn-close shadow-none" @click="cerrarModalRevisar"></button>

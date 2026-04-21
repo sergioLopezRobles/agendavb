@@ -1,9 +1,12 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, nextTick } from 'vue';
+import QRCode from 'qrcode'; // <-- NUEVA LIBRERÍA
+
+// Componentes
 import Layout   from '../componentes/Layout.vue';
 import PlanCard from '../componentes/PlanCard.vue';
-import QrcodeVue from 'qrcode.vue'; // --> IMPORTAMOS LA LIBRERÍA DE QR
 
+// Composables
 import { useNegocios  } from '../composables/useNegocios.js';
 import { useServicios } from '../composables/useServicios.js';
 
@@ -18,27 +21,30 @@ const {
     abrirModalEdicion, guardarEdicion,
     toggleHorario, toggleHorarioEdicion,
     agregarTelefonoNuevo, quitarTelefonoNuevo,
-    agregarTelefonoEdicion, quitarTelefonoEdicion
-} = useNegocios();
+    agregarTelefonoEdicion, quitarTelefonoEdicion,
+    manejarLogoNuevo,
+    manejarLogoEdicion, } = useNegocios();
 
 // ── SERVICIOS ─────────────────────────────────────────────────────────────────
 const {
     mostrarModalServicios, mostrarModalFormServicio, negocioActualServicios,
-    servicios, busquedaServicio, esEditarServicio, minutosDisponibles,
+    busquedaServicio, esEditarServicio, minutosDisponibles,
     limiteServicios, totalServicios, formularioServicio, erroresServicio,
-    serviciosFiltrados, porcentajeAnticipo, anticipoMinimo, setAnticipoMinimo,
+    serviciosFiltrados, anticipoMinimo, setAnticipoMinimo,
+    permiteNotas,
     abrirServicios, abrirFormularioServicio, cerrarFormularioServicio,
-    guardarServicio, eliminarServicio
+    guardarServicio, eliminarServicio, mostrarModalVistaPrevia, servicioEnVistaPrevia,
+    fechaActual, horaActual, canvasQRPreview, abrirVistaPrevia, cerrarVistaPrevia,
+    tipoTelefono, minimoCancelacionPlan, ejecutarCancelacion
 } = useServicios(token);
 
 // ── LÓGICA DE COPIAR PORTAPAPELES Y CÓDIGO QR ─────────────────────────────────
 const mostrarModalQR = ref(false);
 const negocioActualQR = ref(null);
+const canvasQR = ref(null); // Referencia al canvas del DOM
 
 const copiarSlug = async (slug) => {
     const url = `https://${slug}`;
-
-    // Si tiene HTTPS (Producción)
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(url);
@@ -47,7 +53,6 @@ const copiarSlug = async (slug) => {
             window.$toast.show('Error al copiar el enlace', 'danger', 3000);
         }
     } else {
-        // Método de respaldo para HTTP (Laragon local)
         try {
             const textArea = document.createElement("textarea");
             textArea.value = url;
@@ -56,10 +61,8 @@ const copiarSlug = async (slug) => {
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-
             document.execCommand('copy');
             document.body.removeChild(textArea);
-
             window.$toast.show('¡Enlace copiado al portapapeles! 📋', 'success', 3000);
         } catch (err) {
             window.$toast.show('Error al copiar el enlace', 'danger', 3000);
@@ -67,16 +70,80 @@ const copiarSlug = async (slug) => {
     }
 };
 
-const abrirModalQR = (negocio) => {
+const abrirModalQR = async (negocio) => {
     negocioActualQR.value = negocio;
     mostrarModalQR.value = true;
+
+    // Esperamos a que el modal y el canvas se rendericen en el DOM
+    await nextTick();
+    generarQRPersonalizado();
+};
+
+const generarQRPersonalizado = async () => {
+    if (!canvasQR.value || !negocioActualQR.value) return;
+
+    const canvas = canvasQR.value;
+    const ctx = canvas.getContext('2d');
+    const url = `https://${negocioActualQR.value.slug}`;
+    const size = 200;
+    const paddingBottom = 35;
+
+    // Ajustar tamaño del canvas
+    canvas.width = size;
+    canvas.height = size + paddingBottom;
+
+    try {
+        const qrDataUrl = await QRCode.toDataURL(url, {
+            errorCorrectionLevel: 'H',
+            margin: 2,
+            width: size,
+            color: { dark: '#000000', light: '#FFFFFF' }
+        });
+
+        const qrImg = new Image();
+        qrImg.onload = () => {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(qrImg, 0, 0);
+
+            // 2.TAMAÑO DEL LOGO DEL CENTRO
+            const logoSize = 60;
+            const centerX = size / 2;
+            const centerY = size / 2;
+
+            // Círculo blanco de fondo
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, logoSize / 2 + 4, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+
+            // Texto "VB"
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 35px Arial, sans-serif'; // Letra
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('VB', centerX, centerY + 2);
+
+            // Nombre del negocio abajo
+            ctx.fillStyle = '#333333';
+            ctx.font = 'bold 15px "Helvetica Neue", Helvetica, Arial, sans-serif'; // Letra
+            ctx.textAlign = 'center';
+
+            let nombre = negocioActualQR.value.nombre;
+            if (nombre.length > 25) nombre = nombre.substring(0, 22) + '...';
+
+            ctx.fillText(nombre, size / 2, size + 18);
+        };
+        qrImg.src = qrDataUrl;
+
+    } catch (err) {
+        console.error('Error generando QR', err);
+    }
 };
 
 const descargarQR = () => {
-    // Buscamos el canvas que genera la librería qrcode.vue
-    const canvas = document.querySelector('.qr-container canvas');
-    if (canvas) {
-        const url = canvas.toDataURL('image/png');
+    if (canvasQR.value) {
+        const url = canvasQR.value.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = url;
         link.download = `QR_${negocioActualQR.value.slug}.png`;
@@ -112,46 +179,54 @@ onMounted(() => {
 
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
+                <table class="table table-hover align-middle mb-0" style="white-space: nowrap;">
                     <thead class="bg-light">
                     <tr>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Nombre</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Negocio</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Dirección</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Enlace (Público)</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">QR</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">QR</th>
                         <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Correo</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Teléfonos</th>
-                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Horarios</th>
-                        <th class="py-3 px-5 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
+                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Teléfonos</th>
+                        <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr v-for="negocio in negocios" :key="negocio.id">
-                        <td class="px-4 py-3 fw-bold text-dark">
-                            <span class="fs-5 me-2">🏪</span>{{ negocio.nombre }}
+                        <td class="px-4 py-3 fw-bold text-dark d-flex align-items-center border-bottom-0">
+                            <img v-if="negocio.logo" :src="'/' + negocio.logo" alt="Logo" class="rounded-circle me-3 object-fit-cover shadow-sm border" style="width: 42px; height: 42px;">
+                            <div v-else class="rounded-circle me-3 d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary fs-5 shadow-sm border border-primary border-opacity-25" style="width: 42px; height: 42px;">
+                                🏪
+                            </div>
+                            <span class="text-truncate" style="max-width: 160px;" :title="negocio.nombre">{{ negocio.nombre }}</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div @click="copiarSlug(negocio.slug)" class="d-inline-flex align-items-center bg-primary bg-opacity-10 px-3 py-1 rounded-pill text-primary fw-medium copy-pill" title="Clic para copiar enlace">
-                                <span class="me-2 fs-6">🔗</span> {{ negocio.slug }}
+                        <td class="px-4 py-3 border-bottom-0">
+                            <div class="text-truncate text-muted" style="max-width: 180px;" :title="negocio.direccion">
+                                <span v-if="negocio.direccion" class="fs-6 me-1">📍</span>
+                                {{ negocio.direccion || 'No especificada' }}
                             </div>
                         </td>
-                        <td class="px-4 py-3">
-                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2" title="Generar código QR">📱</button>
+                        <td class="px-4 py-3 border-bottom-0">
+                            <div @click="copiarSlug(negocio.slug)" class="d-inline-flex align-items-center bg-primary bg-opacity-10 px-3 py-1 rounded-pill text-primary fw-medium copy-pill" title="Clic para copiar enlace">
+                                <span class="me-2 fs-6">🔗</span> <span class="text-truncate" style="max-width: 130px;">{{ negocio.slug }}</span>
+                            </div>
                         </td>
-
-                        <td class="px-4 py-3 text-muted">{{ negocio.email }}</td>
-                        <td class="px-4 py-3 text-muted">
+                        <td class="px-4 py-3 text-center border-bottom-0">
+                            <button @click="abrirModalQR(negocio)" class="btn btn-sm btn-outline-dark rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Generar código QR">⛶</button>
+                        </td>
+                        <td class="px-4 py-3 text-muted border-bottom-0">
+                            <div class="text-truncate" style="max-width: 150px;" :title="negocio.email">{{ negocio.email }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-center text-muted border-bottom-0">
                             <span class="badge bg-info text-dark rounded-pill shadow-sm">{{ negocio.telefonos?.length || 0 }} Números</span>
                         </td>
-                        <td class="px-4 py-3 text-muted">
-                            <span class="badge bg-light text-secondary border">Múltiples turnos</span>
-                        </td>
-                        <td class="px-4 py-3 text-end">
-                            <button @click="abrirModalEdicion(negocio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-2" title="Editar Información">✏️</button>
-                            <button @click="intentarAccesoPremium(1) ? abrirServicios(negocio) : null" class="btn btn-sm btn-outline-success rounded-circle p-2 me-2" title="Agregar Servicios">📋</button>
+                        <td class="px-4 py-3 text-end border-bottom-0">
+                            <button @click="abrirModalEdicion(negocio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Editar Información">✏️</button>
+                            <button @click="intentarAccesoPremium(1) ? abrirServicios(negocio) : null" class="btn btn-sm btn-outline-success rounded-circle p-2 d-inline-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Agregar Servicios">📋</button>
                         </td>
                     </tr>
                     <tr v-if="negocios.length === 0">
-                        <td colspan="6" class="text-center py-5 text-muted">
+                        <td colspan="7" class="text-center py-5 text-muted">
                             Aún no tienes negocios registrados.
                         </td>
                     </tr>
@@ -173,8 +248,29 @@ onMounted(() => {
                         <p class="text-primary fw-bold small mt-1">{{ negocioActualQR?.nombre }}</p>
                     </div>
 
-                    <div class="qr-container bg-white p-3 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
-                        <qrcode-vue :value="`https://${negocioActualQR?.slug}`" :size="200" level="H" foreground="#000000" />
+                    <div v-if="mostrarModalQR" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button type="button" class="btn-close shadow-none" @click="mostrarModalQR = false"></button>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h5 class="fw-bolder text-dark mb-1">Tu Código QR</h5>
+                                    <p class="text-muted small mb-0">Escanea para ir a tu agenda</p>
+                                </div>
+
+                                <div class="bg-white p-2 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
+                                    <div class="bg-white p-2 rounded-4 mx-auto shadow-sm mb-4 d-inline-block border">
+                                        <canvas ref="canvasQR" style="border-radius: 8px; max-width: 100%; height: auto;"></canvas>
+                                    </div>
+                                </div>
+
+                                <button @click="descargarQR" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm d-flex justify-content-center align-items-center">
+                                    <span class="fs-5 me-2">⬇️</span> Descargar PNG
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <button @click="descargarQR" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm d-flex justify-content-center align-items-center">
@@ -195,13 +291,32 @@ onMounted(() => {
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
-                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores.edicion_nombre }">
-                            <div class="invalid-feedback fw-medium">{{ errores.edicion_nombre }}</div>
+                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
                         </div>
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">URL del Negocio</label>
                             <input type="text" v-model="negocioEditando.slug" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Dirección</label>
+                                <input type="text" v-model="negocioEditando.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Actualizar Logo</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="flex-shrink-0">
+                                        <img v-if="negocioEditando.logoPreview" :src="negocioEditando.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
+                                        <img v-else-if="negocioEditando.logoActual" :src="'/' + negocioEditando.logoActual" alt="Logo Actual" class="rounded-circle object-fit-cover shadow-sm border" style="width: 48px; height: 48px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <input type="file" @change="manejarLogoEdicion" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -262,6 +377,25 @@ onMounted(() => {
                             <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
                             <input type="text" v-model="nuevoNegocio.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores.nombre }" placeholder="Ej. Sucursal Centro">
                             <div class="invalid-feedback fw-medium">{{ errores.nombre }}</div>
+                        </div>
+
+                        <div class="row g-3 mb-3 mt-1">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Dirección (Opcional)</label>
+                                <input type="text" v-model="nuevoNegocio.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold text-secondary">Logo (Opcional)</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="flex-shrink-0">
+                                        <img v-if="nuevoNegocio.logoPreview" :src="nuevoNegocio.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <input type="file" @change="manejarLogoNuevo" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-3">
@@ -387,6 +521,7 @@ onMounted(() => {
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Nombre</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Precio Total</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Anticipo Fijo</th>
+                                    <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Método</th>
                                     <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Duración</th>
                                     <th class="py-3 px-3 text-end text-secondary fw-semibold border-bottom-0">Acciones</th>
                                 </tr>
@@ -395,15 +530,23 @@ onMounted(() => {
                                 <tr v-for="servicio in serviciosFiltrados" :key="servicio.id">
                                     <td class="px-3 py-3 fw-bold text-dark">{{ servicio.nombre }}</td>
                                     <td class="px-3 py-3 text-success fw-bold">${{ servicio.precio }}</td>
-                                    <td class="px-3 py-3 text-primary fw-bold">${{ servicio.anticipo }}</td>
+                                    <td class="px-3 py-3 text-primary fw-bold">
+                                        {{ servicio.anticipo ? '$' + servicio.anticipo : '(Sin anticipo)' }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span v-if="servicio.tarjeta == '1'" class="badge bg-primary bg-opacity-10 text-primary rounded-pill">💳 Tarjeta</span>
+                                        <span v-else class="badge bg-success bg-opacity-10 text-success rounded-pill">💵 Efectivo</span>
+                                    </td>
                                     <td class="px-3 py-3 text-muted">{{ servicio.duracion_minutos }} min</td>
-                                    <td class="px-3 py-3 text-end">
-                                        <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary p-2 me-2">Editar</button>
-                                        <button @click="eliminarServicio(servicio.id)" class="btn btn-sm btn-outline-danger p-2">Borrar</button>
+                                    <td class="text-end">
+                                        <button @click="abrirVistaPrevia(servicio)" class="btn btn-sm btn-outline-info rounded-circle p-2 me-1" title="Vista Previa">👁️</button>
+
+                                        <button @click="abrirFormularioServicio(servicio)" class="btn btn-sm btn-outline-primary rounded-circle p-2 me-1">✏️</button>
+                                        <button @click="eliminarServicio(servicio.id)" class="btn btn-sm btn-outline-danger rounded-circle p-2">🗑️</button>
                                     </td>
                                 </tr>
                                 <tr v-if="serviciosFiltrados.length === 0">
-                                    <td colspan="5" class="text-center py-4 text-muted">No se encontraron servicios.</td>
+                                    <td colspan="6" class="text-center py-4 text-muted">No se encontraron servicios.</td>
                                 </tr>
                                 </tbody>
                             </table>
@@ -426,6 +569,26 @@ onMounted(() => {
                             <input type="text" v-model="formularioServicio.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.nombre }">
                             <div class="invalid-feedback fw-medium">{{ erroresServicio.nombre }}</div>
                         </div>
+
+                        <div class="mb-4 bg-light p-3 rounded-3 border d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0 fw-bold text-dark">Anticipo Permitido</h6>
+                                <small class="text-muted">Elige cómo cobrarás este servicio.</small>
+                            </div>
+                            <div class="form-check form-switch fs-4 mb-0">
+                                <input class="form-check-input cursor-pointer" type="checkbox" role="switch" id="switchTarjeta"
+                                       :checked="formularioServicio.tarjeta === '1'"
+                                       @change="
+                           formularioServicio.tarjeta = $event.target.checked ? '1' : '0';
+                           if (formularioServicio.tarjeta === '1' && !formularioServicio.anticipo) {
+                               formularioServicio.anticipo = anticipoMinimo.toFixed(2);
+                           } else if (formularioServicio.tarjeta === '0') {
+                               formularioServicio.anticipo = '';
+                           }
+                       ">
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Precio Total</label>
@@ -435,18 +598,24 @@ onMounted(() => {
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.precio }}</div>
                                 </div>
                             </div>
+
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-semibold text-secondary d-flex justify-content-between">
                                     <span>Pago de Anticipo</span>
-                                    <span v-if="formularioServicio.precio" class="badge bg-primary text-white cursor-pointer" @click="setAnticipoMinimo" style="cursor: pointer;" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
+                                    <span v-if="formularioServicio.precio && formularioServicio.tarjeta === '1'" class="badge bg-primary text-white cursor-pointer shadow-sm" @click="setAnticipoMinimo" title="Autocompletar mínimo">Mín. ${{ anticipoMinimo.toFixed(2) }}</span>
                                 </label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-0">$</span>
-                                    <input type="number" step="0.01" v-model="formularioServicio.anticipo" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': erroresServicio.anticipo }" placeholder="Ej. 100.00">
+                                    <input type="number" step="0.01" v-model="formularioServicio.anticipo"
+                                           class="form-control form-control-lg bg-light border-0 shadow-sm"
+                                           :class="{ 'is-invalid': erroresServicio.anticipo }"
+                                           placeholder="0.00"
+                                           :disabled="formularioServicio.tarjeta === '0'">
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.anticipo }}</div>
                                 </div>
-                                <small class="text-muted d-block mt-1">El cliente deberá abonar esto al agendar.</small>
+                                <small class="text-muted d-block mt-1">Se exige el mínimo si cobras con tarjeta.</small>
                             </div>
+
                             <div class="col-md-12 mb-3">
                                 <label class="form-label fw-semibold text-secondary">Duración de la cita</label>
                                 <div class="input-group">
@@ -457,6 +626,20 @@ onMounted(() => {
                                     <div class="invalid-feedback fw-medium">{{ erroresServicio.duracion }}</div>
                                 </div>
                             </div>
+
+                            <div v-if="permiteNotas" class="col-md-12 mb-2 mt-2">
+                                <label class="form-label fw-semibold text-secondary d-flex align-items-center">
+                                    Notas y Recomendaciones
+                                    <span class="badge bg-success bg-opacity-10 text-success ms-2 shadow-sm border border-success border-opacity-25" style="font-size: 0.7rem;">Premium</span>
+                                </label>
+                                <textarea v-model="formularioServicio.notas"
+                                          class="form-control bg-light border-0 shadow-sm p-3"
+                                          rows="3"
+                                          style="resize: none;"
+                                          placeholder="- Llegar 5 minutos antes de la cita.&#10;- Cancelar con anticipación si no puede asistir."></textarea>
+                                <small class="text-muted d-block mt-1">El cliente verá estas notas al momento de agendar.</small>
+                            </div>
+
                         </div>
                         <div class="mt-4">
                             <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3 shadow-sm" @click="guardarServicio()">
@@ -467,10 +650,126 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+
+        <div v-if="mostrarModalVistaPrevia" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: #f4f6f9;">
+
+                    <div class="bg-white border-bottom p-3 d-flex justify-content-between align-items-center relative">
+                        <div class="position-absolute top-0 start-0 w-100 bg-primary" style="height: 4px;"></div>
+
+                        <div class="d-flex align-items-center mt-1">
+                            <img src="../../images/logo-vb.jpg" alt="Vista Boreal" class="rounded shadow-sm" style="width: 32px; height: 32px; object-fit: cover;">
+                            <span class="ms-2 fw-bolder text-dark" style="letter-spacing: -0.5px; font-size: 1.1rem;">Vista Boreal <span class="text-muted fw-normal fs-6">| Confirmación de Reserva</span></span>
+                        </div>
+                        <button type="button" class="btn-close shadow-none" @click="cerrarVistaPrevia()"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <div class="bg-white rounded-4 shadow-sm border p-4">
+
+                            <div class="text-center mb-4">
+                                <p class="text-muted fw-bold mb-0" style="font-size: 0.75rem; letter-spacing: 1px; text-transform: uppercase;">Resumen de Reservación</p>
+                            </div>
+
+                            <div class="row g-4">
+
+                                <div class="col-md-6 border-end pr-4">
+
+                                    <div class="d-flex align-items-center mb-4 bg-light p-3 rounded-3 border">
+                                        <img v-if="negocioActualServicios?.logo" :src="'/' + negocioActualServicios.logo" alt="Logo Negocio" class="rounded-circle shadow-sm border object-fit-cover flex-shrink-0" style="width: 55px; height: 55px;">
+                                        <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-white text-muted border shadow-sm flex-shrink-0" style="width: 55px; height: 55px; font-size: 1.3rem;">🏪</div>
+
+                                        <div class="ms-3">
+                                            <h5 class="fw-bolder text-dark mb-0">{{ negocioActualServicios?.nombre }}</h5>
+                                            <p class="text-muted small mb-0 text-truncate" style="max-width: 250px;">{{ negocioActualServicios?.direccion || 'Dirección no especificada' }}</p>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="fw-bold text-secondary mb-3 small text-uppercase" style="letter-spacing: 0.5px;">Detalles del Servicio</h6>
+                                    <div class="bg-white">
+                                        <div class="row g-2 small">
+                                            <div class="col-5 text-muted fw-semibold">Nombre Cliente:</div>
+                                            <div class="col-7 fw-bold text-dark text-end text-truncate"> </div>
+
+                                            <div class="col-5 text-muted fw-semibold">Servicio:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ servicioEnVistaPrevia?.nombre }}</div>
+
+                                            <div class="col-5 text-muted fw-semibold">Anticipo:</div>
+                                            <div class="col-7 fw-bold text-end" :class="servicioEnVistaPrevia?.anticipo > 0 ? 'text-primary' : 'text-success'">
+                                                {{ servicioEnVistaPrevia?.anticipo > 0 ? '$' + Number(servicioEnVistaPrevia.anticipo).toFixed(2) : 'Sin anticipo' }}
+                                            </div>
+
+                                            <div class="col-5 text-muted fw-semibold">Fecha de Registro:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ fechaActual }}</div>
+
+                                            <div class="col-5 text-muted fw-semibold">Hora de Registro:</div>
+                                            <div class="col-7 fw-bold text-dark text-end">{{ horaActual }}</div>
+
+                                            <div class="col-12 mt-2 pt-2 border-top"></div>
+
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold mb-1">Teléfonos del Negocio:</div>
+                                                <div class="d-flex flex-wrap gap-1 justify-content-start mt-1">
+                                            <span v-for="(tel, i) in negocioActualServicios?.telefonos" :key="i" class="badge bg-light border text-dark shadow-sm" style="font-size: 0.75rem;">
+                                                {{ tipoTelefono(tel.id_tipo) }}: {{ tel.numero }}
+                                            </span>
+                                                    <span v-if="!negocioActualServicios?.telefonos?.length" class="text-muted small">No registrados</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 d-flex flex-column">
+
+                                    <div v-if="servicioEnVistaPrevia?.notas" class="mb-4 flex-grow-1">
+                                        <h6 class="fw-bold text-secondary mb-3 small text-uppercase" style="letter-spacing: 0.5px;">
+                                            Notas y Recomendaciones
+                                        </h6>
+                                        <div class="bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 p-3 text-dark small position-relative" style="white-space: pre-line; min-height: 100px;">
+                                            <span class="position-absolute top-0 end-0 me-3 mt-2 fs-5 opacity-50">📌</span>
+                                            {{ servicioEnVistaPrevia.notas }}
+                                        </div>
+                                    </div>
+
+                                    <div v-else class="mb-4 flex-grow-1 d-flex align-items-center justify-content-center border rounded-3 bg-light text-muted small px-3 py-4">
+                                        Este servicio no incluye notas adicionales.
+                                    </div>
+
+                                    <div class="text-center mt-auto pt-3 border-top">
+                                        <p class="text-muted small fw-semibold mb-2">REVISA TU CITA</p>
+
+                                        <div class="d-inline-block bg-white p-2 border rounded-4 shadow-sm hover-shadow transition-all mb-3">
+                                            <canvas ref="canvasQRPreview" style="max-width: 100%; height: auto; border-radius: 8px;"></canvas>
+                                        </div>
+
+                                        <div class="px-3">
+                                            <button @click="ejecutarCancelacion" type="button" class="btn btn-outline-danger w-100 rounded-pill py-2 fw-bold d-flex align-items-center justify-content-center transition-all hover-shadow">
+                                                <span class="me-2">🚫</span> Cancelar Reservación
+                                            </button>
+                                            <p class="text-muted mt-2 mb-0" style="font-size: 0.7rem;">
+                                                * Sujeto a política de cancelación:
+                                                <span class="fw-bold">{{ Number(minimoCancelacionPlan) > 0 ? minimoCancelacionPlan + ' min' : 'Sin límite' }}</span>
+                                            </p>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </Layout>
 </template>
 
 <style scoped>
+/*
+ * Estilos para el efecto hover en el "pill" del enlace copiable.
+ */
 .copy-pill {
     cursor: pointer;
     transition: all 0.2s ease-in-out;

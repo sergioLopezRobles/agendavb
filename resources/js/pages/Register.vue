@@ -191,7 +191,7 @@ if(data.valid){
                         </div>
 
                         <div class="col-12 mt-3 mb-2">
-                            <label class="form-label fw-semibold">Teléfono Celular aqui iba lo de twilio</label>
+                            <label class="form-label fw-semibold">Teléfono Celular</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0">🇲🇽 +52</span>
                                 <input v-model="telefono" type="tel" class="form-control form-control-lg bg-light border-0" :class="{ 'is-invalid': telefonoError }" placeholder="10 dígitos" maxlength="10" @input="telefono = telefono.replace(/\D/g, '')">

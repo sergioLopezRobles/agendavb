@@ -7,30 +7,35 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\File;
 use App\Clases\GlobalFuncion;
+use App\Traits\RegistraMovimientos;
 
 class DashboardController extends Controller
 {
+    use RegistraMovimientos;
+
     public function index(){
         $idUsuario = Auth::id();
 
-        Log::info('entro Dashboard ' . $idUsuario);
-
-        $usuarioLoggeado = DB::select("SELECT id_plan, email, name FROM users WHERE id = " . $idUsuario);
+        $usuarioLoggeado = DB::table('users as u')
+            ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
+            ->select('pu.id_plan', 'u.email', 'u.name')
+            ->where('u.id', $idUsuario)
+            ->first();
 
         $cantidadNegocios = DB::table('negocios')->where('id_usuario', $idUsuario)->count();
+
         if($usuarioLoggeado != null){
-            if($usuarioLoggeado[0]->id_plan != null){
+            if($usuarioLoggeado->id_plan != null){
                 $globalFuncion = new GlobalFuncion();
-                $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado[0]->id_plan);
+                $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
                 $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
 
                 return response()->json([
                     'valid' => true,
                     'planAdquirido' => $planAdquirido,
-                    'usuarioLoggeado' => $usuarioLoggeado[0],
+                    'usuarioLoggeado' => $usuarioLoggeado,
                     'cantidadNegocios' => $cantidadNegocios,
                     'prioridadesTicket' => $prioridadesTicket
                 ]);
@@ -38,7 +43,7 @@ class DashboardController extends Controller
                 return response()->json([
                     'valid' => true,
                     'planAdquirido' => null,
-                    'usuarioLoggeado' => $usuarioLoggeado[0],
+                    'usuarioLoggeado' => $usuarioLoggeado,
                     'cantidadNegocios' => $cantidadNegocios
                 ]);
             }
@@ -50,108 +55,21 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function registrarPlanNegocio(Request $request){
-        try {
-            $planNegocio = DB::table('planes')->where('id', $request->plan)->first();
-
-            if($planNegocio != null){
-                $globalFuncion = new GlobalFuncion();
-                $caracteristicasPlan = $globalFuncion->obtenerPlanCompleto($planNegocio->id);
-
-                $maxPermitido = $caracteristicasPlan->maximonegocios ?? 1;
-                $cantidadActual = DB::table('negocios')->where('id_usuario', Auth::id())->count();
-
-                if ($cantidadActual >= $maxPermitido) {
-                    return response()->json([
-                        'valid' => false,
-                        'message' => 'Límite alcanzado. Tu plan permite un máximo de ' . $maxPermitido . ' negocio(s).'
-                    ]);
-                }
-
-                $slugBase = $request->slug ? Str::slug($request->slug) : Str::slug($request->nombre);
-                $slug = 'www.agendavb/' . $slugBase . '.com';
-
-                if($planNegocio->id != 3){
-                    $slug = 'www.agendavb/' . Str::uuid() . '.com';
-                }
-
-                $existeSlug = DB::table('negocios')->where('slug', $slug)->exists();
-                if ($existeSlug && $planNegocio->id == 3) {
-                    return response()->json([
-                        'valid' => false,
-                        'message' => 'Esta URL de negocio ya está ocupada. Por favor elige otra.'
-                    ]);
-                }
-
-                // 1. INSERCIÓN DEL NEGOCIO (SIN TELÉFONO)
-                $idNegocio = DB::table('negocios')->insertGetId([
-                    'id_usuario' => $request->user()->id,
-                    'id_plan' => $request->plan,
-                    'nombre' => $request->nombre,
-                    'slug' => $slug,
-                    'email' => $request->email,
-                    'whatsapp_creditos' => $caracteristicasPlan->whatsapp_creditos_iniciales ?? 0,
-                    'created_at' => Carbon::now(),
-                    'updated_at' => Carbon::now()
-                ]);
-
-                // 2. INSERCIÓN DE MÚLTIPLES TELÉFONOS
-                if ($request->has('telefonos') && is_array($request->telefonos)) {
-                    $telefonosInsert = [];
-                    foreach ($request->telefonos as $tel) {
-                        if (!empty($tel['numero'])) {
-                            $telefonosInsert[] = [
-                                'id_negocio' => $idNegocio,
-                                'id_tipo_numero_telefono' => $tel['id_tipo'],
-                                'numero_telefono' => $tel['numero'],
-                                'created_at' => Carbon::now(),
-                                'updated_at' => Carbon::now()
-                            ];
-                        }
-                    }
-                    if (count($telefonosInsert) > 0) {
-                        DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
-                    }
-                }
-
-                // 3. INSERCIÓN DE HORARIOS
-                foreach($request->horarios as $horario){
-                    $horas = explode(' - ', $horario);
-                    DB::table('horarios_negocios')->insert([
-                        'id_negocio' => $idNegocio,
-                        'hora_inicio' => $horas[0],
-                        'hora_fin' => $horas[1],
-                    ]);
-                }
-
-                DB::table('users')->where('id', Auth::id())->update([
-                    'id_plan' => $request->plan
-                ]);
-
-                return response()->json([
-                    'valid' => true,
-                    'message' => '¡Negocio registrado exitosamente!'
-                ]);
-            }
-
-            return response()->json([
-                'valid' => false,
-                'message' => 'El plan no existe'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Error SQL: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function misNegocios(Request $request){
         $idUsuario = Auth::id();
 
-        $usuarioLoggeado = DB::table('users')->select('name', 'email', 'id_plan')->where('id', $idUsuario)->first();
-        $planAdquirido = DB::table('planes')->where('id', $usuarioLoggeado->id_plan)->first();
+        $usuarioLoggeado = DB::table('users as u')
+            ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
+            ->select('u.name', 'u.email', 'pu.id_plan')
+            ->where('u.id', $idUsuario)
+            ->first();
+
+        $planAdquirido = null;
+        if($usuarioLoggeado && $usuarioLoggeado->id_plan) {
+            $globalFuncion = new GlobalFuncion();
+            $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
+        }
+
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
         foreach ($negocios as $negocio) {
@@ -197,13 +115,43 @@ class DashboardController extends Controller
                 ]);
             }
 
-            // Actualizamos datos básicos (ya sin teléfono)
+            // Preparar datos base para actualizar
+            $updateData = [
+                'nombre' => $request->nombre,
+                'direccion' => $request->direccion,
+                'updated_at' => Carbon::now()
+            ];
+
+            // Procesar el nuevo Logo (si viene)
+            if ($request->hasFile('logo')) {
+                $carpetaDestino = base_path('../uploads/documentos/imagenes/');
+
+                // Borrar logo anterior físicamente si existía
+                if ($negocioMio->logo) {
+                    $rutaLogoViejo = base_path('../' . $negocioMio->logo);
+                    if (File::exists($rutaLogoViejo)) {
+                        File::delete($rutaLogoViejo);
+                    }
+                }
+
+                // Crear carpeta si no existe
+                if (!file_exists($carpetaDestino)) {
+                    mkdir($carpetaDestino, 0777, true);
+                }
+
+                // Guardar nuevo logo
+                $archivo = $request->file('logo');
+                $nombreArchivo = 'Foto-logo-' . $id . '-' . date('His') . '.' . $archivo->getClientOriginalExtension();
+                $archivo->move($carpetaDestino, $nombreArchivo);
+
+                // Asignar al arreglo de actualización
+                $updateData['logo'] = 'uploads/documentos/imagenes/' . $nombreArchivo;
+            }
+
+            // Ejecutamos la actualización
             DB::table('negocios')
                 ->where('id', $id)
-                ->update([
-                    'nombre' => $request->nombre,
-                    'updated_at' => Carbon::now()
-                ]);
+                ->update($updateData);
 
             // ACTUALIZAMOS TELÉFONOS
             DB::table('numeros_telefonos_negocio')->where('id_negocio', $id)->delete();
@@ -241,6 +189,9 @@ class DashboardController extends Controller
                     }
                 }
             }
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('negocios', 'editar', $request->nombre, $request->all());
+
 
             return response()->json([
                 'valid' => true,

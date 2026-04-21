@@ -80,7 +80,6 @@ router.beforeEach((to, from, next) => {
         return next('/dashboard')
     }
     next()
-    return true
 })
 
 export default router

@@ -4,10 +4,12 @@
             <div class="row gy-4 mb-4">
 
                 <div class="col-lg-4 col-md-6 pe-lg-5 text-center text-md-start">
+
                     <div class="d-flex align-items-center justify-content-center justify-content-md-start mb-3">
-                        <span class="fs-3 text-primary me-2">🏢</span>
+                        <img src="../../images/logo-vb.jpg" alt="Vista Boreal" class="rounded shadow-sm me-3" style="width: 40px; height: 40px; object-fit: cover;">
                         <h4 class="fw-bolder text-dark mb-0 tracking-tight">Vista Boreal</h4>
                     </div>
+
                     <p class="text-muted small mb-4 pe-lg-4" style="line-height: 1.6;">
                         Plataforma integral orientada a la gestión de sucursales, automatización de citas y administración de tu agenda digital en la nube.
                     </p>
@@ -17,7 +19,7 @@
                             <i class="fab fa-facebook-f"></i>
                         </a>
                         <a href="#" class="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center text-muted social-btn" style="width: 38px; height: 38px;">
-                            <i class="fab fa-twitter"></i>
+                            <i class="fab fa-x"></i>
                         </a>
                         <a href="#" class="btn btn-light btn-sm rounded-circle d-flex align-items-center justify-content-center text-muted social-btn" style="width: 38px; height: 38px;">
                             <i class="fab fa-instagram"></i>

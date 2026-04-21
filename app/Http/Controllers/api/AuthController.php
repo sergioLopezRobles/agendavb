@@ -7,67 +7,98 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
+use App\Traits\RegistraMovimientos;
 
 class AuthController extends Controller
 {
+    use RegistraMovimientos;
+
     public function register(Request $request){
+        try {
+            $existeCorreo = DB::select("SELECT email FROM users WHERE email = '$request->email'");
 
-        $existeCorreo = DB::select("SELECT email FROM users WHERE email = '$request->email'");
+            if($existeCorreo != null){
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'El correo ya existe'
+                ]);
+            }
 
-        if($existeCorreo != null){
-            //existe correo electronico
-            Log::info('entro');
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'telefono' => $request->telefono
+            ]);
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('usuarios', 'crear', $request->name, $request->all());
+
+
+            return response()->json([
+                'valid' => true,
+                'message' => 'Registro exitoso',
+                'user' => $user,
+                'token' => $token
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'valid' => false,
-                'message' => 'El correo ya existe'
-            ]);
+                'message' => 'Error en el servidor: ' . $e->getMessage()
+            ], 500);
         }
-        Log::info('entro 2');
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'telefono' => $request->telefono // <-- AQUÍ SE GUARDA EL TELÉFONO VERIFICADO
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'valid' => true,
-            'message' => 'Registro exitoso',
-            'user' => $user,
-            'token' => $token
-        ]);
     }
 
     public function login(Request $request){
-        $user = User::where('email', $request->email)->first();
+        try {
+            $user = User::where('email', $request->email)->first();
 
-        if(!$user || !Hash::check($request->password, $user->password)){
+            if(!$user || !Hash::check($request->password, $user->password)){
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'Credenciales incorrectas'
+                ]);
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            $planUsuario = DB::table('plan_usuarios')->where('id_usuario', $user->id)->first();
+            $user->id_plan = $planUsuario ? $planUsuario->id_plan : null;
+
             return response()->json([
-                'message' => 'Credenciales incorrectas'
+                'valid' => true,
+                'user' => $user,
+                'token' => $token,
+                'has_plan' => $planUsuario ? true : false
             ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'valid' => false,
+                'message' => 'Error en el servidor: ' . $e->getMessage()
+            ], 500);
         }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'token' => $token
-        ]);
     }
 
     public function user(Request $request){
-        return response()->json($request->user());
+        try {
+            $user = $request->user();
+
+            $planUsuario = DB::table('plan_usuarios')->where('id_usuario', $user->id)->first();
+            $user->id_plan = $planUsuario ? $planUsuario->id_plan : null;
+
+            return response()->json($user);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function logout(Request $request){
-
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
+            'valid' => true,
             'message' => 'Logout exitoso'
         ]);
     }

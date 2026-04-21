@@ -10,11 +10,13 @@ return new class extends Migration
     {
         Schema::create('negocios', function (Blueprint $table) {
             $table->id();
-            $table->string('id_usuario'); // Dueño del negocio
-            $table->string('id_plan');    // Plan que eligió (LA QUE FALTABA)
+            $table->string('id_usuario');
+            $table->string('id_plan');
             $table->string('nombre');
             $table->string('slug')->unique();
             $table->string('email');
+            $table->string('logo')->nullable();
+            $table->string('direccion')->nullable();
             $table->string('whatsapp_creditos')->default('0');
             $table->string('hora_inicio')->nullable();
             $table->string('hora_fin')->nullable();

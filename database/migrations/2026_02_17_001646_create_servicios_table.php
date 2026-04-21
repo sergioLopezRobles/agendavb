@@ -15,12 +15,12 @@ return new class extends Migration
             $table->id();
             $table->string('id_negocio');
             $table->string('nombre');
-            // Cambiamos a decimal para poder calcular el porcentaje exacto sin errores
             $table->decimal('precio', 10, 2);
-            // Nuevo campo para guardar de cuánto es el anticipo (Ej. si el precio es 1000 y el plan pide 10%, aquí se guarda 100.00)
-            $table->decimal('anticipo', 10, 2)->nullable();
-            $table->string('tarjeta')->default('0');
             $table->integer('duracion_minutos');
+            $table->decimal('anticipo', 10, 2)->nullable();
+            $table->string('tarjeta')->default('0'); // 0 = Efectivo, 1 = Tarjeta
+            $table->text('notas')->nullable();
+            $table->integer('minutos_cancelacion')->default(0);
             $table->timestamps();
         });
     }

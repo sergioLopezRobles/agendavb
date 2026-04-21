@@ -13,7 +13,7 @@ const route = useRoute();
 const slug = route.params.slug;
 
 //STRIPE
-const stripePromise = loadStripe('pk_test_51SdC6n2Kyc20Semo6gAyq0TTApvii42va2XGLdeOL3njGMLJ6eU2eTNJvsnWV21gQRCjFqUWAdY08LJLF8DimTTm00s87OKbJ3');
+const stripePromise = loadStripe('pk_test_51T8vO4CPQ2Qy65AdX1JGvoLFng7dtqBIWCaWAbVENn8JNGyQbYmC6hfFjdStUT2AAdRUOyLz6E35IqdlkWfglDQ5009NWtv54j');
 let stripe = null;
 let cardElement = null;
 const errorTarjeta = ref('');

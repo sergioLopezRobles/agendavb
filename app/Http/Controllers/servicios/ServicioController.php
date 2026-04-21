@@ -7,9 +7,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use App\Traits\RegistraMovimientos;
 
 class ServicioController extends Controller
 {
+    use RegistraMovimientos;
+
     public function obtenerServicios($idNegocio)
     {
         try {
@@ -40,19 +43,26 @@ class ServicioController extends Controller
                 ->first();
             $limiteServicios = $limiteServiciosRow ? $limiteServiciosRow->valor : null;
 
-            // OBTENER PORCENTAJE DE ANTICIPO DEL PLAN
             $anticipoRow = DB::table('caracteristicasplanes')
                 ->where('id_plan', $negocio->id_plan)
                 ->where('titulo', 'anticipo_forzoso')
                 ->first();
-            $porcentajeAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
+            $minimoAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
+
+            // -> NUEVO: OBTENER LOS MINUTOS DE CANCELACIÓN DEL PLAN
+            $cancelacionRow = DB::table('caracteristicasplanes')
+                ->where('id_plan', $negocio->id_plan)
+                ->where('titulo', 'minimo_minutos_cancelacion_servicio')
+                ->first();
+            $minimoCancelacion = $cancelacionRow ? $cancelacionRow->valor : 0;
 
             return response()->json([
                 'valid'               => true,
                 'servicios'           => $servicios,
                 'minutos_permitidos'  => $minutosPermitidos,
                 'limite_servicios'    => $limiteServicios,
-                'porcentaje_anticipo' => $porcentajeAnticipo,
+                'minimo_anticipo'     => $minimoAnticipo,
+                'minimo_cancelacion'  => $minimoCancelacion, // -> ENVIAR AL FRONTEND
                 'total_servicios'     => $servicios->count()
             ]);
 
@@ -95,16 +105,21 @@ class ServicioController extends Controller
                 }
             }
 
-            // GUARDAMOS CON EL ANTICIPO
+            // -> GUARDAMOS CON LOS NUEVOS CAMPOS NOTAS Y MINUTOS_CANCELACION
             DB::table('servicios')->insert([
-                'id_negocio'       => $request->id_negocio,
-                'nombre'           => $request->nombre,
-                'precio'           => $request->precio,
-                'anticipo'         => $request->anticipo, // -> NUEVO CAMPO
-                'duracion_minutos' => $request->duracion_minutos,
-                'created_at'       => Carbon::now(),
-                'updated_at'       => Carbon::now()
+                'id_negocio'          => $request->id_negocio,
+                'nombre'              => $request->nombre,
+                'precio'              => $request->precio,
+                'anticipo'            => $request->anticipo,
+                'tarjeta'             => $request->tarjeta,
+                'duracion_minutos'    => $request->duracion_minutos,
+                'notas'               => $request->notas ?? null, // -> NUEVO
+                'created_at'          => Carbon::now(),
+                'updated_at'          => Carbon::now()
             ]);
+
+            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
+            $this->guardarLog('servicios', 'crear', $request->nombre, $request->all());
 
             return response()->json([
                 'valid'   => true,
@@ -136,16 +151,20 @@ class ServicioController extends Controller
                 return response()->json(['valid' => false, 'message' => 'No tienes permisos']);
             }
 
-            // ACTUALIZAMOS CON EL ANTICIPO
             DB::table('servicios')
                 ->where('id', $id)
                 ->update([
-                    'nombre'           => $request->nombre,
-                    'precio'           => $request->precio,
-                    'anticipo'         => $request->anticipo, // -> NUEVO CAMPO
-                    'duracion_minutos' => $request->duracion_minutos,
-                    'updated_at'       => Carbon::now()
+                    'nombre'              => $request->nombre,
+                    'precio'              => $request->precio,
+                    'anticipo'            => $request->anticipo,
+                    'tarjeta'             => $request->tarjeta,
+                    'duracion_minutos'    => $request->duracion_minutos,
+                    'notas'               => $request->notas ?? null,
+                    'updated_at'          => Carbon::now()
                 ]);
+
+            // 3. REGISTRAMOS LA EDICIÓN
+            $this->guardarLog('servicios', 'editar', $request->nombre, $request->all());
 
             return response()->json([
                 'valid'   => true,
@@ -177,6 +196,9 @@ class ServicioController extends Controller
             }
 
             DB::table('servicios')->where('id', $id)->delete();
+
+            // 3. REGISTRAMOS LA ELIMINACIÓN
+            $this->guardarLog('servicios', 'eliminar', $servicio->nombre, ['id' => $id]);
 
             return response()->json([
                 'valid'   => true,

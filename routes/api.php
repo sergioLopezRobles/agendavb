@@ -27,42 +27,44 @@ Route::get('/planes',[PlanController::class,'verplanes'])->name('plan.verplanes'
 Route::post('/register',[AuthController::class,'register']);
 Route::post('/login',[AuthController::class,'login']);
 
-// RUTAS DE TWILIO (Deben ser públicas para el registro)
+// RUTAS DE TWILIO
 Route::post('/enviar-codigo', [TwilioController::class, 'enviarCodigo']);
 Route::post('/verificar-codigo', [TwilioController::class, 'verificarCodigo']);
 
-// RUTAS DEL MODULO CITASCLIENTES
+// CITAS CLIENTES
 Route::get('/citasclientes/{slug}',[CitasClientesController::class,'citasclientes']);
 Route::post('/registrar-cita-cliente',[CitasClientesController::class,'registrarcitacliente']);
 Route::post('/horarios-disponibles',[CitasClientesController::class,'horariosdisponibles']);
 
-// RUTAS PRIVADAS (Requieren sesión iniciada)
+// PRIVADAS
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
     Route::post('/logout',[AuthController::class,'logout']);
 
-    //ruta dashboard
     Route::get('/dashboard',[DashboardController::class,'index']);
 
-    // Rutas del Módulo de Negocios
+    // Negocios
     Route::get('/mis-negocios', [DashboardController::class, 'misNegocios']);
     Route::put('/negocios/{id}', [DashboardController::class, 'actualizarNegocio']);
 
-    // RUTAS PARA EL CRUD DE SERVICIOS
+    // Servicios
     Route::get('/negocios/{id}/servicios', [ServicioController::class, 'obtenerServicios']);
     Route::post('/servicios', [ServicioController::class, 'store']);
     Route::put('/servicios/{id}', [ServicioController::class, 'update']);
     Route::delete('/servicios/{id}', [ServicioController::class, 'destroy']);
 
-    //RUTAS PARA MODULO TICKETS
+    // Tickets
     Route::get('/tickets', [TicketController::class, 'index']);
     Route::post('/tickets', [TicketController::class, 'store']);
     Route::put('/tickets/{id}', [TicketController::class, 'update']);
 
-    //RUTA STRIPE PARA PAGAR PLAN
+    // Stripe
     Route::post('/registrar-plan-negocio', [NegocioController::class, 'registrarPlanNegocio']);
+    Route::post('/upgrade-plan', [NegocioController::class, 'upgradePlanStripe']);
 
-    // RUTAS CITASNEGOCIO
+    // Citas Negocio
     Route::get('/citas-negocios', [CitasNegociosController::class, 'citasnegocios']);
     Route::get('/citas-negocios/{id_negocio}', [CitasNegociosController::class, 'obtenerCitasNegocio']);
+    //CREAR NUEVO NEGOCIO PLANES MEDIO-AVANZADO
+    Route::post('/negocios-extra', [NegocioController::class, 'crearNegocioExtra']);
 });
