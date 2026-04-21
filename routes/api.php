@@ -65,6 +65,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Citas Negocio
     Route::get('/citas-negocios', [CitasNegociosController::class, 'citasnegocios']);
     Route::get('/citas-negocios/{id_negocio}', [CitasNegociosController::class, 'obtenerCitasNegocio']);
+    Route::post('/actualizar-estado-cita', [CitasNegociosController::class, 'actualizarEstadoCita']);
+
     //CREAR NUEVO NEGOCIO PLANES MEDIO-AVANZADO
     Route::post('/negocios-extra', [NegocioController::class, 'crearNegocioExtra']);
 });
