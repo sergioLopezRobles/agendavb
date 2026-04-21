@@ -14,6 +14,7 @@ const planAdquirido = ref(null);
 
 // ALMACENAR NEGOCIOS
 const negocios = ref([]);
+const estadosCita = ref([]);
 
 // ... tus variables globales existentes ...
 const citasNegocio = ref([]);
@@ -64,6 +65,7 @@ const cargarDatosCitas = async () => {
 
         if(data.valid) {
             negocios.value = data.negocios;
+            estadosCita.value = data.estados;
 
             console.log(negocios);
         }
@@ -88,10 +90,17 @@ const calendarOptions = ref({
     plugins: [dayGridPlugin, interactionPlugin],
     initialView: 'dayGridMonth',
     locale: 'es',
+    // ESTO ES LO QUE FALTA PARA EL FORMATO
+    eventTimeFormat: {
+        hour: 'numeric',
+        minute: '2-digit',
+        meridiem: 'short', // Esto pone el 'am' o 'pm'
+        hour12: true
+    },
     events: eventosCalendario,
     eventClick: (info) => {
         // Al hacer clic en un evento (cita existente)
-        citaDetalle.value = info.event.extendedProps;
+        citaDetalle.value = { ...info.event.extendedProps };
         mostrarModalDetalle.value = true;
     },
     headerToolbar: {
@@ -102,6 +111,7 @@ const calendarOptions = ref({
 });
 
 // FUNCIÓN PARA ABRIR LA AGENDA
+/*
 const abrirAgenda = async (negocio) => {
     negocioSeleccionado.value = negocio;
     try {
@@ -118,6 +128,24 @@ const abrirAgenda = async (negocio) => {
     } catch (error) {
         window.$toast.show('Error al cargar la agenda', 'danger', 4000);
     }
+};*/
+const abrirAgenda = async (negocio) => {
+    negocioSeleccionado.value = negocio;
+    try {
+        const response = await fetch(`/api/citas-negocios/${negocio.id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if(data.valid) {
+            citasNegocio.value = data.citas;
+            estadosCita.value = data.estados; // 🔥 ESTA ES LA SOLUCIÓN AL SELECT VACÍO
+            mostrarModalAgenda.value = true;
+            // Forzamos el renderizado del calendario después de que el modal sea visible
+            await nextTick();
+        }
+    } catch (error) {
+        window.$toast.show('Error al cargar la agenda', 'danger', 4000);
+    }
 };
 
 const cerrarModalAgenda = () => {
@@ -125,6 +153,31 @@ const cerrarModalAgenda = () => {
     citasNegocio.value = [];
 };
 
+const guardarEstado = async () => {
+    try {
+        const response = await fetch('/api/actualizar-estado-cita', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                id_cita: citaDetalle.value.id,
+                id_estado: citaDetalle.value.id_estado
+            })
+        });
+        const data = await response.json();
+        if(data.valid) {
+            window.$toast.show('Estado actualizado correctamente', 'success', 3000);
+            mostrarModalDetalle.value = false;
+            // 🔥 CAMBIAMOS ESTO PARA QUE SE REFRESQUE EL CALENDARIO CORRECTAMENTE
+            abrirAgenda(negocioSeleccionado.value);
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        window.$toast.show('Error al actualizar el estado', 'danger', 3000);
+    }
+};
 </script>
 
 <template>
@@ -173,12 +226,16 @@ const cerrarModalAgenda = () => {
                     </div>
                     <div class="modal-body pt-0">
                         <div class="p-3 bg-light rounded-3">
-                            <p class="mb-1 small text-muted">Cliente:</p>
-                            <p class="fw-bold mb-2">{{ citaDetalle.cliente_nombre }}</p>
-
-                            <p class="mb-1 small text-muted">Teléfono:</p>
-                            <p class="mb-2">{{ citaDetalle.cliente_telefono }}</p>
-
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <p class="mb-1 small text-muted">Cliente:</p>
+                                    <p class="fw-bold mb-2">{{ citaDetalle.cliente_nombre }}</p>
+                                </div>
+                                <div>
+                                    <p class="mb-1 small text-muted">Teléfono:</p>
+                                    <p class="fw-bold mb-2">{{ citaDetalle.cliente_telefono }}</p>
+                                </div>
+                            </div>
                             <div class="d-flex justify-content-between">
                                 <div>
                                     <p class="mb-1 small text-muted">Hora:</p>
@@ -188,6 +245,18 @@ const cerrarModalAgenda = () => {
                                     <p class="mb-1 small text-muted">Fecha:</p>
                                     <p class="fw-bold">{{ citaDetalle.fecha }}</p>
                                 </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="small text-muted">Estado de la cita:</label>
+                                <select class="form-select fw-bold" v-model="citaDetalle.id_estado">
+                                    <option v-for="estado in estadosCita" :key="estado.id" :value="estado.id">
+                                        {{ estado.titulo }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="modal-footer mt-3 d-flex justify-content-between">
+                                <!-- <button type="button" class="btn btn-secondary" @click="mostrarModalDetalle = false">Cerrar</button>-->
+                                <button type="button" class="btn btn-primary" @click="guardarEstado">Actualizar Estado</button>
                             </div>
                         </div>
                     </div>

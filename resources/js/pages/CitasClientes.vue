@@ -52,6 +52,21 @@ const nombreServicioSeleccionado = computed(() => {
     return servicio ? servicio.nombre : 'Servicio desconocido';
 });
 
+const anticipoServicioSeleccionado = computed(() => {
+    // SI AUN NO HAN SELECCIONADO UN SERVICIO, DEVOLVEMOS UN TEXTO VACIO
+    if (!formularioCitaCliente.value.id_servicio) {
+        return 'Sin asignar';
+    }
+
+    // BUSCAMOS DENTRO DE TU ARREGLO 'SERVICIOS' EL QUE COINCIDA CON EL ID SELECCIONADO
+    const servicio = servicios.value.find(
+        (s) => s.id === formularioCitaCliente.value.id_servicio
+    );
+
+    // SI LO ENCUENTRA, DEVUELVE EL ANTICIPO
+    return servicio ? servicio.anticipo : 'Servicio desconocido';
+});
+
 // DETECTA SI EL SERVICIO SELECCIONADO TIENE UN ANTICIPO VALIDO (DIFERENTE DE NULL O 0)
 const requiereAnticipo = computed(() => {
     if (!formularioCitaCliente.value.id_servicio) return false;
@@ -59,6 +74,14 @@ const requiereAnticipo = computed(() => {
     const servicio = servicios.value.find(s => s.id === formularioCitaCliente.value.id_servicio);
     // RETORNA TRUE SI EL SERVICIO EXISTE Y SU ANTICIPO NO ES NULO NI CERO
     return servicio && servicio.anticipo !== null && servicio.anticipo > 0;
+});
+
+const requiereTarjeta = computed(() => {
+    if (!formularioCitaCliente.value.id_servicio) return false;
+
+    const servicio = servicios.value.find(s => s.id === formularioCitaCliente.value.id_servicio);
+    // RETORNA TRUE SI EL SERVICIO EXISTE Y SU ANTICIPO NO ES NULO NI CERO
+    return servicio && Number(servicio.tarjeta) === 1;
 });
 
 // OBJETO PARA GESTIONAR LOS MENSAJES DE ERROR DE VALIDACIÓN
@@ -219,7 +242,7 @@ const guardarCitaCliente = async () => {
 
     let stripePaymentMethodId = null;
     // SOLO VALIDAMOS STRIPE SI HAY ANTICIPO
-    if (requiereAnticipo.value) {
+    if (requiereAnticipo.value && requiereTarjeta.value) {
         // 1. PEDIRLE A STRIPE QUE POCESE LA TARJETA ANTES DE GUARDAR EN TU BD
         const {paymentMethod, error} = await stripe.createPaymentMethod({
             type: 'card',
@@ -436,7 +459,7 @@ const validarFormularioCitaCliente = () => {
                             {{ erroresFormularioCitaCliente.hora }}
                         </small>
                     </div>
-                    <div class="mb-3 pt-2 border-top" v-show="requiereAnticipo">
+                    <div class="mb-3 pt-2 border-top" v-show="requiereAnticipo && requiereTarjeta">
                         <label class="form-label fw-semibold text-secondary">
                             💳 Detalles de pago (Modo Prueba)
                         </label>
@@ -468,6 +491,7 @@ const validarFormularioCitaCliente = () => {
                 <hr>
                 <div style="margin-bottom: 10px;"><b>FECHA:</b> {{ formularioCitaCliente.fecha }}</div>
                 <div style="margin-bottom: 10px;"><b>HORA:</b> {{ formularioCitaCliente.hora }}</div>
+                <div style="margin-bottom: 10px;" v-if="requiereAnticipo"><b>ANTICIPO PAGADO:</b> ${{ anticipoServicioSeleccionado }}</div>
                 <hr>
                 <div style="margin-bottom: 10px;"><p style="text-align:center;">¡Gracias por su preferencia!</p></div>
             </div>

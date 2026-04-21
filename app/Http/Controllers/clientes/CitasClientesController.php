@@ -24,7 +24,7 @@ class CitasClientesController extends Controller
         $servicios = DB::table('servicios')->where('id_negocio', $negocio->id)->get();
 
         // REGISTRO DE LOS DATOS OBTENIDOS EN LOS LOGS
-        Log::info('servicios: ' . $servicios);
+        Log::info('servicios: ' . json_encode($servicios));
 
         // RETORNO DE UNA RESPUESTA EN FORMATO JSON CON LOS DATOS Y ESTADO DE VALIDACIÓN
         return response()->json(['valid' => true, 'servicios' => $servicios, 'nombre_negocio' => $negocio->nombre]);
@@ -38,17 +38,18 @@ class CitasClientesController extends Controller
             $negocio = DB::table('negocios')->where('slug', $request->slug)->first();
 
             // BUSCA EL SERVICIO SOLICITADO PARA OBTENER INFORMACIÓN COMO EL PRECIO
-            $servicioSeleccionado = DB::table('servicios')->where('id', $request->id_servicio)->get();
+            $servicioSeleccionado = DB::table('servicios')->where('id', $request->id_servicio)->first();
 
             // VERIFICA SI EL SERVICIO EXISTE EN LA BASE DE DATOS
             if ($servicioSeleccionado != null) {
                 // EXISTE SERVICIO
-                $anticipo = $servicioSeleccionado[0]->anticipo;
+                $anticipo = $servicioSeleccionado->anticipo ?? 0;
+                $tarjeta = $servicioSeleccionado->tarjeta ?? 0;
 
                 $globalFuncion = new GlobalFuncion();
 
                 // REALIZAR PAGO CON STRIPE SOLO SI REQUIERE ANTICIPO
-                if (!empty($anticipo) && $anticipo > 0) {
+                if (!empty($anticipo) && $anticipo > 0 && $tarjeta == 1) {
 
                     $respuestaPago = $globalFuncion->pagoUnicoStripe($request->cliente_email, $negocio->id, $request->id_servicio, $request->payment_method_id, $anticipo);
 
@@ -78,8 +79,8 @@ class CitasClientesController extends Controller
                     'fecha' => $request->fecha,
                     'hora' => $request->hora,   // HORA SELECCIONADA POR EL CLIENTE
                     'anticipo' => $anticipo,
-                    'total' => $servicioSeleccionado[0]->precio,    // PRECIO OBTENIDO DE LA BD
-                    'estado' => '0',
+                    'total' => $servicioSeleccionado->precio,    // PRECIO OBTENIDO DE LA BD
+                    'id_estado' => '1',
                     'recordatorio_enviado' => '0',
                     'created_at' => Carbon::now(),
                     'updated_at' => Carbon::now()
@@ -204,10 +205,19 @@ class CitasClientesController extends Controller
                     while ($inicioLibre->copy()->addMinutes($duracionServicio) <= $finLibre) {
 
                         // ❌ bloquear horas pasadas
-                        if ($fecha == Carbon::today()->format('Y-m-d') &&
-                            $inicioLibre->lessThan(Carbon::now())) {
-                            $inicioLibre->addMinutes($duracionServicio);
-                            continue;
+                        if ($fecha == Carbon::today()->format('Y-m-d')
+                            //&& $inicioLibre->lessThan(Carbon::now())
+                        ) {
+                            $horaActual = Carbon::now()->format('H:i'); // Obtenemos la hora real Ej: "14:30"
+                            $horaEvaluar = $inicioLibre->format('H:i'); // La hora del bloque Ej: "08:00"
+
+                            // Si la hora del bloque es menor (ya pasó) que la hora actual, saltamos al siguiente
+                            if ($horaEvaluar < $horaActual) {
+                                $inicioLibre->addMinutes($duracionServicio);
+                                continue;
+                            }
+                            //$inicioLibre->addMinutes($duracionServicio);
+                            //continue;
                         }
 
                         $horaInicio = $inicioLibre->format('H:i');

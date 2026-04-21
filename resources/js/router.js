@@ -52,6 +52,11 @@ const routes = [
         path: '/citas-negocios',
         component: CitasNegocios,
         meta: { requiresAuth: true }
+    },
+    {
+        path: '/actualizar-estado-cita',
+        component: CitasNegocios,
+        meta: { requiresAuth: true }
     }
 ]
 
