@@ -8,11 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
-use App\Traits\RegistraMovimientos; // ── NUEVO
+use App\Traits\RegistraMovimientos;
 
 class TicketController extends Controller
 {
-    use RegistraMovimientos; // ── NUEVO
+    use RegistraMovimientos;
 
     public function index()
     {
@@ -71,24 +71,27 @@ class TicketController extends Controller
                 $existe = DB::table('ticket_soporte_usuarios_negocios')->where('id', $idGenerado)->exists();
             } while ($existe);
 
-            DB::table('ticket_soporte_usuarios_negocios')->insert([
-                'id'          => $idGenerado,
-                'id_usuario'  => Auth::id(),
-                'id_negocio'  => $request->id_negocio,
-                'id_pregunta' => $request->id_pregunta,
-                'asunto'      => $request->asunto,
-                'id_prioridad'=> null,
-                'id_estado'   => '1',
-                'created_at'  => Carbon::now(),
-                'updated_at'  => Carbon::now()
-            ]);
+            DB::transaction(function () use ($idGenerado, $request){
 
-            // ── LOG: ticket creado ────────────────────────────────────────────
-            $this->guardarLog('tickets', 'crear', $idGenerado, [
-                'asunto'      => $request->asunto,
-                'id_negocio'  => $request->id_negocio,
-                'id_pregunta' => $request->id_pregunta
-            ]);
+                DB::table('ticket_soporte_usuarios_negocios')->insert([
+                    'id'          => $idGenerado,
+                    'id_usuario'  => Auth::id(),
+                    'id_negocio'  => $request->id_negocio,
+                    'id_pregunta' => $request->id_pregunta,
+                    'asunto'      => $request->asunto,
+                    'id_prioridad'=> null,
+                    'id_estado'   => '1',
+                    'created_at'  => Carbon::now(),
+                    'updated_at'  => Carbon::now()
+                ]);
+
+                // ── LOG: ticket creado ────────────────────────────────────────────
+                $this->guardarLog('tickets', 'crear', $idGenerado, [
+                    'asunto'      => $request->asunto,
+                    'id_negocio'  => $request->id_negocio,
+                    'id_pregunta' => $request->id_pregunta
+                ]);
+            });
 
             return response()->json([
                 'valid'   => true,
@@ -100,25 +103,37 @@ class TicketController extends Controller
                 'valid'   => false,
                 'message' => 'Error al crear el ticket: ' . $e->getMessage()
             ], 500);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'valid'   => false,
+                'message' => 'Error al crear el ticket 2: ' . $e->getMessage()
+            ], 500);
         }
     }
 
     public function update(Request $request, $id)
     {
         try {
-            DB::table('ticket_soporte_usuarios_negocios')
-                ->where('id', $id)
-                ->update([
+            // Envolvemos las dos operaciones en la transacción
+            DB::transaction(function () use ($request, $id) {
+
+                // 1. Actualizamos el ticket
+                DB::table('ticket_soporte_usuarios_negocios')
+                    ->where('id', $id)
+                    ->update([
+                        'id_prioridad' => $request->id_prioridad,
+                        'id_estado'    => $request->id_estado,
+                        'updated_at'   => Carbon::now()
+                    ]);
+
+                // 2. Guardamos el log
+                // Si esto falla por alguna razón, el ticket vuelve a su estado anterior automáticamente
+                $this->guardarLog('tickets', 'editar', $id, [
                     'id_prioridad' => $request->id_prioridad,
-                    'id_estado'    => $request->id_estado,
-                    'updated_at'   => Carbon::now()
+                    'id_estado'    => $request->id_estado
                 ]);
 
-            // ── LOG: ticket actualizado (cambio de estado o prioridad) ────────
-            $this->guardarLog('tickets', 'editar', $id, [
-                'id_prioridad' => $request->id_prioridad,
-                'id_estado'    => $request->id_estado
-            ]);
+            }); // Fin de la transacción
 
             return response()->json([
                 'valid'   => true,

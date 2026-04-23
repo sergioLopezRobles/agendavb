@@ -16,8 +16,6 @@ return new class extends Migration
             $table->string('tipo_numero_telefono');
             $table->timestamps();
         });
-
-        // Insertar los catálogos por defecto
         \Illuminate\Support\Facades\DB::table('tipos_numero_telefono')->insert([
             ['id' => 1, 'tipo_numero_telefono' => 'WhatsApp', 'created_at' => now(), 'updated_at' => now()],
             ['id' => 2, 'tipo_numero_telefono' => 'Fijo', 'created_at' => now(), 'updated_at' => now()],

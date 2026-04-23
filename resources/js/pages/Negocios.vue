@@ -280,32 +280,48 @@ onMounted(() => {
             </div>
         </div>
 
-        <div v-if="mostrarModalEdicion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div v-if="mostrarModalEdicion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow-lg rounded-4">
-                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                        <h5 class="modal-title fw-bold text-dark">✏️ Editar Negocio</h5>
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+
+                    <!-- Header -->
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4 px-md-5 pt-md-5">
+                        <div>
+                            <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-2 rounded-pill fw-bold mb-2">Editar información</span>
+                            <h3 class="modal-title fw-bolder text-dark">Actualiza tu negocio</h3>
+                        </div>
                         <button type="button" class="btn-close shadow-none" @click="mostrarModalEdicion = false"></button>
                     </div>
-                    <div class="modal-body px-4 py-4">
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
-                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
+                    <div class="modal-body px-4 py-4 px-md-5">
+
+                        <!-- Resumen del negocio que se edita -->
+                        <div class="d-flex justify-content-between align-items-center p-4 rounded-4 mb-4 border" style="background-color: #f8f9fa;">
+                            <div class="d-flex align-items-center gap-3">
+                                <img v-if="negocioEditando.logoActual" :src="'/' + negocioEditando.logoActual" alt="Logo" class="rounded-circle object-fit-cover shadow-sm border" style="width: 48px; height: 48px;">
+                                <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary border fs-5" style="width: 48px; height: 48px;">🏪</div>
+                                <div>
+                                    <p class="text-muted small fw-bold mb-0 text-uppercase">Negocio seleccionado</p>
+                                    <h5 class="fw-bold text-dark mb-0">{{ negocioEditando.nombre }}</h5>
+                                </div>
+                            </div>
+                            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2">{{ negocioEditando.slug }}</span>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">URL del Negocio</label>
-                            <input type="text" v-model="negocioEditando.slug" class="form-control form-control-lg text-muted shadow-none" style="background-color: #e9ecef; border: 1px solid #dee2e6;" disabled>
+                        <!-- Nombre (readonly) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Nombre del Negocio</label>
+                            <input type="text" v-model="negocioEditando.nombre" class="form-control form-control-lg text-muted border-0 px-4" style="background-color: #e9ecef; border-radius: 0.75rem;" disabled>
                         </div>
 
-                        <div class="row g-3 mb-3">
+                        <!-- Dirección + Logo -->
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Dirección</label>
-                                <input type="text" v-model="negocioEditando.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Dirección</label>
+                                <input type="text" v-model="negocioEditando.direccion" class="form-control form-control-lg bg-light border-0 px-4" style="border-radius: 0.75rem;" placeholder="Ej. Av. Principal #123">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Actualizar Logo</label>
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Actualizar Logo</label>
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="flex-shrink-0">
                                         <img v-if="negocioEditando.logoPreview" :src="negocioEditando.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
@@ -313,150 +329,214 @@ onMounted(() => {
                                         <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <input type="file" @change="manejarLogoEdicion" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                        <input type="file" @change="manejarLogoEdicion" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg" style="border-radius: 0.75rem;">
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-                                <label class="form-label fw-semibold text-secondary mb-0">Teléfonos de Contacto (Máx. {{ limiteTelefonos }})</label>
+                        <!-- Teléfonos -->
+                        <div class="mb-4 pt-2 border-top">
+                            <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-0">
+                                    Teléfonos de Contacto (Máx. {{ limiteTelefonos }})
+                                </label>
                                 <button v-if="negocioEditando.telefonos.length < limiteTelefonos" type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" @click="agregarTelefonoEdicion">
                                     + Agregar otro
                                 </button>
                             </div>
                             <div v-for="(tel, index) in negocioEditando.telefonos" :key="index" class="d-flex gap-2 mb-3 align-items-start">
-                                <select v-model="tel.id_tipo" class="form-select bg-light border-0 shadow-sm" style="width: 140px; border-radius: 0.75rem;">
+                                <select v-model="tel.id_tipo" class="form-select bg-light border-0 shadow-sm" style="width: 145px; border-radius: 0.75rem;">
                                     <option :value="1">WhatsApp</option>
                                     <option :value="2">Fijo</option>
                                     <option :value="3">Telegram</option>
                                 </select>
                                 <div class="flex-grow-1">
-                                    <input type="tel" v-model="tel.numero" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores['edicion_telefono_' + index] }" placeholder="10 dígitos" maxlength="10" @input="tel.numero = tel.numero.replace(/\D/g, '')" style="border-radius: 0.75rem;">
-                                    <div class="invalid-feedback fw-medium px-2" v-if="errores['edicion_telefono_' + index]">{{ errores['edicion_telefono_' + index] }}</div>
+                                    <input type="tel" v-model="tel.numero"
+                                           class="form-control form-control-lg bg-light border-0 px-3"
+                                           :class="{ 'is-invalid': errores['edicion_telefono_' + index] }"
+                                           placeholder="10 dígitos" maxlength="10"
+                                           @input="tel.numero = tel.numero.replace(/\D/g, '')"
+                                           style="border-radius: 0.75rem;">
+                                    <div class="invalid-feedback fw-medium px-2" v-if="errores['edicion_telefono_' + index]">
+                                        {{ errores['edicion_telefono_' + index] }}
+                                    </div>
                                 </div>
-                                <button v-if="negocioEditando.telefonos.length > 1" type="button" class="btn btn-light text-danger border-0 rounded-circle mt-1" @click="quitarTelefonoEdicion(index)">❌</button>
+                                <button v-if="negocioEditando.telefonos.length > 1" type="button"
+                                        class="btn btn-light text-danger border-0 rounded-circle mt-1"
+                                        @click="quitarTelefonoEdicion(index)">❌</button>
                             </div>
                         </div>
 
-                        <div class="mb-3 mt-4 pt-3 border-top">
-                            <label class="form-label fw-semibold text-secondary mb-2">Horarios de Atención</label>
-                            <div class="border rounded-3 p-3 bg-light shadow-sm" :class="{'border-danger': errores.edicion_horarios}">
-                                <div class="d-flex flex-wrap gap-2" style="max-height: 160px; overflow-y: auto;">
+                        <!-- Horarios -->
+                        <div class="mb-4 pt-2 border-top">
+                            <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3 d-block mt-3">
+                                Horarios de Atención
+                            </label>
+                            <div class="border rounded-4 p-4 bg-white shadow-sm" :class="{'border-danger': errores.edicion_horarios}">
+                                <div class="d-flex flex-wrap gap-2" style="max-height: 180px; overflow-y: auto;">
                                     <button v-for="hora in horariosDisponibles" :key="hora" type="button"
-                                            class="btn btn-sm rounded-pill fw-medium"
-                                            :class="horariosEdicion.includes(hora) ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white text-dark'"
+                                            class="btn btn-sm rounded-pill fw-medium transition-all px-3 py-2 border"
+                                            :class="horariosEdicion.includes(hora) ? 'btn-primary border-primary shadow-sm text-white' : 'btn-light border-light text-secondary'"
                                             @click="toggleHorarioEdicion(hora)">
-                                        <span class="me-1">{{ horariosEdicion.includes(hora) ? '✓' : '🕒' }}</span>{{ hora }}
+                                        <span v-if="horariosEdicion.includes(hora)" class="me-1">✓</span>{{ hora }}
                                     </button>
                                 </div>
                             </div>
-                            <div class="text-danger small fw-medium mt-2" v-if="errores.edicion_horarios">{{ errores.edicion_horarios }}</div>
+                            <div class="text-danger small fw-medium mt-2 px-2" v-if="errores.edicion_horarios">
+                                {{ errores.edicion_horarios }}
+                            </div>
                         </div>
                     </div>
-                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0">
-                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarEdicion">💾 Guardar Cambios</button>
+
+                    <!-- Footer -->
+                    <div class="modal-footer border-top-0 px-4 pb-5 pt-0 px-md-5 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary fw-bold px-5 py-3 rounded-pill shadow-sm saas-btn" @click="guardarEdicion">
+                            💾 Guardar Cambios
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div v-if="mostrarModalCreacion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div v-if="mostrarModalCreacion" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
             <div class="modal-dialog modal-dialog-centered modal-lg">
-                <div class="modal-content border-0 shadow-lg rounded-4">
-                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                        <h4 class="modal-title fw-bold text-dark d-flex align-items-center">
-                            <span class="fs-3 me-2">🏢</span> Registrar Nuevo Negocio
-                        </h4>
+                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+
+                    <!-- Header -->
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4 px-md-5 pt-md-5">
+                        <div>
+                            <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill fw-bold mb-2">Nuevo registro</span>
+                            <h3 class="modal-title fw-bolder text-dark">Registra tu negocio</h3>
+                        </div>
                         <button type="button" class="btn-close shadow-none" @click="mostrarModalCreacion = false"></button>
                     </div>
-                    <div class="modal-body px-4 py-4">
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">Nombre del Negocio</label>
-                            <input type="text" v-model="nuevoNegocio.nombre" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores.nombre }" placeholder="Ej. Sucursal Centro">
-                            <div class="invalid-feedback fw-medium">{{ errores.nombre }}</div>
+                    <div class="modal-body px-4 py-4 px-md-5">
+
+                        <!-- Resumen del plan activo -->
+                        <div class="d-flex justify-content-between align-items-center p-4 rounded-4 mb-4 border" style="background-color: #f8f9fa;">
+                            <div>
+                                <p class="text-muted small fw-bold mb-1 text-uppercase">Plan activo</p>
+                                <h5 class="fw-bold text-dark mb-0">{{ planAdquirido?.nombre }}</h5>
+                            </div>
+                            <div class="text-end">
+                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2 fw-semibold">
+                            {{ negocios.length }} de {{ limiteNegocios }} negocios
+                        </span>
+                            </div>
                         </div>
 
-                        <div class="row g-3 mb-3 mt-1">
+                        <!-- Nombre -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Nombre del Negocio</label>
+                            <input type="text" v-model="nuevoNegocio.nombre"
+                                   class="form-control form-control-lg bg-light border-0 px-4"
+                                   style="border-radius: 0.75rem;"
+                                   :class="{ 'is-invalid': errores.nombre }"
+                                   placeholder="Ej. Clínica Dental Vista Boreal">
+                            <div class="invalid-feedback fw-medium px-2">{{ errores.nombre }}</div>
+                        </div>
+
+                        <!-- Dirección + Logo -->
+                        <div class="row g-3 mb-4">
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Dirección (Opcional)</label>
-                                <input type="text" v-model="nuevoNegocio.direccion" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Ej. Av. Principal #123">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Dirección (Opcional)</label>
+                                <input type="text" v-model="nuevoNegocio.direccion"
+                                       class="form-control form-control-lg bg-light border-0 px-4"
+                                       style="border-radius: 0.75rem;"
+                                       placeholder="Ej. Av. Principal #123">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold text-secondary">Logo (Opcional)</label>
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide">Logo (Opcional)</label>
                                 <div class="d-flex align-items-center gap-3">
                                     <div class="flex-shrink-0">
                                         <img v-if="nuevoNegocio.logoPreview" :src="nuevoNegocio.logoPreview" alt="Preview" class="rounded-circle object-fit-cover shadow-sm border border-primary border-2" style="width: 48px; height: 48px;">
                                         <div v-else class="rounded-circle d-flex align-items-center justify-content-center bg-light text-muted border shadow-sm" style="width: 48px; height: 48px; font-size: 0.8rem;">Sin foto</div>
                                     </div>
                                     <div class="flex-grow-1">
-                                        <input type="file" @change="manejarLogoNuevo" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg">
+                                        <input type="file" @change="manejarLogoNuevo" class="form-control bg-light border-0 shadow-sm" accept="image/jpeg, image/png, image/jpg" style="border-radius: 0.75rem;">
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-                                <label class="form-label fw-semibold text-secondary mb-0">Teléfonos de Contacto (Máx. {{ limiteTelefonos }})</label>
+                        <!-- Teléfonos -->
+                        <div class="mb-4 pt-2 border-top">
+                            <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+                                <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-0">
+                                    Teléfonos de Contacto (Máx. {{ limiteTelefonos }})
+                                </label>
                                 <button v-if="nuevoNegocio.telefonos.length < limiteTelefonos" type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" @click="agregarTelefonoNuevo">
                                     + Agregar otro
                                 </button>
                             </div>
                             <div v-for="(tel, index) in nuevoNegocio.telefonos" :key="index" class="d-flex gap-2 mb-3 align-items-start">
-                                <select v-model="tel.id_tipo" class="form-select bg-light border-0 shadow-sm" style="width: 140px; border-radius: 0.75rem;">
+                                <select v-model="tel.id_tipo" class="form-select bg-light border-0 shadow-sm" style="width: 145px; border-radius: 0.75rem;">
                                     <option :value="1">WhatsApp</option>
                                     <option :value="2">Fijo</option>
                                     <option :value="3">Telegram</option>
                                 </select>
                                 <div class="flex-grow-1">
-                                    <input type="tel" v-model="tel.numero" class="form-control form-control-lg bg-light border-0 shadow-sm" :class="{ 'is-invalid': errores['telefono_' + index] }" placeholder="10 dígitos" maxlength="10" @input="tel.numero = tel.numero.replace(/\D/g, '')" style="border-radius: 0.75rem;">
-                                    <div class="invalid-feedback fw-medium px-2" v-if="errores['telefono_' + index]">{{ errores['telefono_' + index] }}</div>
+                                    <input type="tel" v-model="tel.numero"
+                                           class="form-control form-control-lg bg-light border-0 px-3"
+                                           :class="{ 'is-invalid': errores['telefono_' + index] }"
+                                           placeholder="10 dígitos" maxlength="10"
+                                           @input="tel.numero = tel.numero.replace(/\D/g, '')"
+                                           style="border-radius: 0.75rem;">
+                                    <div class="invalid-feedback fw-medium px-2" v-if="errores['telefono_' + index]">
+                                        {{ errores['telefono_' + index] }}
+                                    </div>
                                 </div>
-                                <button v-if="nuevoNegocio.telefonos.length > 1" type="button" class="btn btn-light text-danger border-0 rounded-circle mt-1" @click="quitarTelefonoNuevo(index)">❌</button>
+                                <button v-if="nuevoNegocio.telefonos.length > 1" type="button"
+                                        class="btn btn-light text-danger border-0 rounded-circle mt-1"
+                                        @click="quitarTelefonoNuevo(index)">❌</button>
                             </div>
                         </div>
 
-                        <div class="mb-3 mt-4 pt-3 border-top">
-                            <label class="form-label fw-semibold text-secondary mb-2">Horarios de Atención</label>
-                            <div class="border rounded-3 p-3 bg-light shadow-sm" :class="{'border-danger': errores.horarios}">
-                                <div class="d-flex flex-wrap gap-2" style="max-height: 160px; overflow-y: auto;">
+                        <!-- Horarios -->
+                        <div class="mb-4 pt-2 border-top">
+                            <label class="form-label fw-bold text-dark small text-uppercase tracking-wide mb-3 d-block mt-3">
+                                Disponibilidad de Horarios
+                            </label>
+                            <div class="border rounded-4 p-4 bg-white shadow-sm" :class="{'border-danger': errores.horarios}">
+                                <div class="d-flex flex-wrap gap-2" style="max-height: 180px; overflow-y: auto;">
                                     <button v-for="hora in horariosDisponibles" :key="hora" type="button"
-                                            class="btn btn-sm rounded-pill fw-medium"
-                                            :class="horarios.includes(hora) ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white text-dark'"
+                                            class="btn btn-sm rounded-pill fw-medium transition-all px-3 py-2 border"
+                                            :class="horarios.includes(hora) ? 'btn-primary border-primary shadow-sm text-white' : 'btn-light border-light text-secondary'"
                                             @click="toggleHorario(hora)">
-                                        <span class="me-1">{{ horarios.includes(hora) ? '✓' : '🕒' }}</span>{{ hora }}
+                                        <span v-if="horarios.includes(hora)" class="me-1">✓</span>{{ hora }}
                                     </button>
                                 </div>
                             </div>
-                            <div class="text-danger small fw-medium mt-2" v-if="errores.horarios">{{ errores.horarios }}</div>
+                            <div class="text-danger small fw-medium mt-2 px-2" v-if="errores.horarios">{{ errores.horarios }}</div>
                         </div>
 
-                        <div class="col-md-12 mt-4">
-                            <label class="form-label fw-semibold text-secondary d-flex align-items-center">
-                                URL DEL NEGOCIO
+                        <!-- URL personalizada (solo plan Avanzado) -->
+                        <div class="mb-4 pt-2 border-top mt-2">
+                            <label class="form-label fw-bold text-dark small text-uppercase tracking-wide d-flex align-items-center mt-3">
+                                URL del Negocio
                                 <span v-if="planAdquirido?.id < 3" class="badge bg-warning text-dark ms-2 shadow-sm">⭐ Plan Avanzado</span>
                             </label>
-                            <div class="input-group has-validation shadow-sm" @click="planAdquirido?.id < 3 ? intentarAccesoPremium(3) : null">
-                                <span class="input-group-text bg-white border-end-0" :class="{'text-muted': planAdquirido?.id < 3}">www.agendavb/</span>
-                                <input
-                                    type="text"
-                                    v-model="nuevoNegocio.slug"
-                                    @input="nuevoNegocio.slug = nuevoNegocio.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')"
-                                    class="form-control form-control-lg border-start-0"
-                                    :class="{ 'is-invalid': errores.slug, 'bg-light text-muted': planAdquirido?.id < 3 }"
-                                    placeholder="mi-nueva-sucursal"
-                                    :readonly="planAdquirido?.id < 3"
-                                >
-                                <div class="invalid-feedback fw-medium">{{ errores.slug }}</div>
+                            <div class="input-group input-group-lg shadow-sm overflow-hidden" style="border-radius: 0.75rem;"
+                                 @click="planAdquirido?.id < 3 ? intentarAccesoPremium(3) : null">
+                        <span class="input-group-text bg-light border-0 text-muted px-4" :class="{'text-muted': planAdquirido?.id < 3}">
+                            www.agendavb/
+                        </span>
+                                <input type="text" v-model="nuevoNegocio.slug"
+                                       @input="nuevoNegocio.slug = nuevoNegocio.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')"
+                                       class="form-control border-0 bg-light"
+                                       :class="{ 'is-invalid': errores.slug, 'text-muted': planAdquirido?.id < 3 }"
+                                       placeholder="mi-nueva-sucursal"
+                                       :readonly="planAdquirido?.id < 3">
+                                <div class="invalid-feedback fw-medium px-2">{{ errores.slug }}</div>
                             </div>
                         </div>
                     </div>
-                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-center">
-                        <button type="button" class="btn btn-primary fw-bold px-5 py-2 rounded-pill shadow-sm" @click="guardarNuevoNegocio">
-                            💾 Guardar Negocio!
+                    <!-- Footer -->
+                    <div class="modal-footer border-top-0 px-4 pb-5 pt-0 px-md-5 d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary fw-bold px-5 py-3 rounded-pill shadow-sm saas-btn" @click="guardarNuevoNegocio">
+                            🏢 Registrar Negocio
                         </button>
                     </div>
                 </div>
@@ -742,16 +822,6 @@ onMounted(() => {
 
                                         <div class="d-inline-block bg-white p-2 border rounded-4 shadow-sm hover-shadow transition-all mb-3">
                                             <canvas ref="canvasQRPreview" style="max-width: 100%; height: auto; border-radius: 8px;"></canvas>
-                                        </div>
-
-                                        <div class="px-3">
-                                            <button @click="ejecutarCancelacion" type="button" class="btn btn-outline-danger w-100 rounded-pill py-2 fw-bold d-flex align-items-center justify-content-center transition-all hover-shadow">
-                                                <span class="me-2">🚫</span> Cancelar Reservación
-                                            </button>
-                                            <p class="text-muted mt-2 mb-0" style="font-size: 0.7rem;">
-                                                * Sujeto a política de cancelación:
-                                                <span class="fw-bold">{{ Number(minimoCancelacionPlan) > 0 ? minimoCancelacionPlan + ' min' : 'Sin límite' }}</span>
-                                            </p>
                                         </div>
 
                                     </div>

@@ -7,13 +7,6 @@ use Illuminate\Support\Facades\Auth;
 
 trait RegistraMovimientos
 {
-    /**
-     * Guarda el movimiento del usuario.
-     * * @param string $tabla El nombre de la tabla (ej. 'servicios', 'negocios')
-     * @param string $accion 'crear', 'editar', 'eliminar'
-     * @param string $identificador Nombre de lo que se afectó (ej. 'Corte de Cabello')
-     * @param array $detalles Arreglo con los datos extras
-     */
     public function guardarLog($tabla, $accion, $identificador, $detalles = [])
     {
         if (Auth::check()) {

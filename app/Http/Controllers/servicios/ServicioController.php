@@ -49,7 +49,6 @@ class ServicioController extends Controller
                 ->first();
             $minimoAnticipo = $anticipoRow ? $anticipoRow->valor : 0;
 
-            // -> NUEVO: OBTENER LOS MINUTOS DE CANCELACIÓN DEL PLAN
             $cancelacionRow = DB::table('caracteristicasplanes')
                 ->where('id_plan', $negocio->id_plan)
                 ->where('titulo', 'minimo_minutos_cancelacion_servicio')
@@ -62,7 +61,7 @@ class ServicioController extends Controller
                 'minutos_permitidos'  => $minutosPermitidos,
                 'limite_servicios'    => $limiteServicios,
                 'minimo_anticipo'     => $minimoAnticipo,
-                'minimo_cancelacion'  => $minimoCancelacion, // -> ENVIAR AL FRONTEND
+                'minimo_cancelacion'  => $minimoCancelacion,
                 'total_servicios'     => $servicios->count()
             ]);
 
@@ -105,21 +104,23 @@ class ServicioController extends Controller
                 }
             }
 
-            // -> GUARDAMOS CON LOS NUEVOS CAMPOS NOTAS Y MINUTOS_CANCELACION
-            DB::table('servicios')->insert([
-                'id_negocio'          => $request->id_negocio,
-                'nombre'              => $request->nombre,
-                'precio'              => $request->precio,
-                'anticipo'            => $request->anticipo,
-                'tarjeta'             => $request->tarjeta,
-                'duracion_minutos'    => $request->duracion_minutos,
-                'notas'               => $request->notas ?? null, // -> NUEVO
-                'created_at'          => Carbon::now(),
-                'updated_at'          => Carbon::now()
-            ]);
+            // ABRIMOS LA TRANSACCIÓN
+            DB::transaction(function () use ($request) {
+                DB::table('servicios')->insert([
+                    'id_negocio'          => $request->id_negocio,
+                    'nombre'              => $request->nombre,
+                    'precio'              => $request->precio,
+                    'anticipo'            => $request->anticipo,
+                    'tarjeta'             => $request->tarjeta,
+                    'duracion_minutos'    => $request->duracion_minutos,
+                    'notas'               => $request->notas ?? null,
+                    'created_at'          => Carbon::now(),
+                    'updated_at'          => Carbon::now()
+                ]);
 
-            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
-            $this->guardarLog('servicios', 'crear', $request->nombre, $request->all());
+                // REGISTRAMOS EL LOG
+                $this->guardarLog('servicios', 'crear', $request->nombre, $request->all());
+            }); // FIN TRANSACCIÓN
 
             return response()->json([
                 'valid'   => true,
@@ -151,20 +152,23 @@ class ServicioController extends Controller
                 return response()->json(['valid' => false, 'message' => 'No tienes permisos']);
             }
 
-            DB::table('servicios')
-                ->where('id', $id)
-                ->update([
-                    'nombre'              => $request->nombre,
-                    'precio'              => $request->precio,
-                    'anticipo'            => $request->anticipo,
-                    'tarjeta'             => $request->tarjeta,
-                    'duracion_minutos'    => $request->duracion_minutos,
-                    'notas'               => $request->notas ?? null,
-                    'updated_at'          => Carbon::now()
-                ]);
+            // ABRIMOS LA TRANSACCIÓN
+            DB::transaction(function () use ($request, $id) {
+                DB::table('servicios')
+                    ->where('id', $id)
+                    ->update([
+                        'nombre'              => $request->nombre,
+                        'precio'              => $request->precio,
+                        'anticipo'            => $request->anticipo,
+                        'tarjeta'             => $request->tarjeta,
+                        'duracion_minutos'    => $request->duracion_minutos,
+                        'notas'               => $request->notas ?? null,
+                        'updated_at'          => Carbon::now()
+                    ]);
 
-            // 3. REGISTRAMOS LA EDICIÓN
-            $this->guardarLog('servicios', 'editar', $request->nombre, $request->all());
+                // REGISTRAMOS LA EDICIÓN EN EL LOG
+                $this->guardarLog('servicios', 'editar', $request->nombre, $request->all());
+            }); // FIN TRANSACCIÓN
 
             return response()->json([
                 'valid'   => true,
@@ -195,10 +199,13 @@ class ServicioController extends Controller
                 return response()->json(['valid' => false, 'message' => 'No tienes permisos']);
             }
 
-            DB::table('servicios')->where('id', $id)->delete();
+            // ABRIMOS LA TRANSACCIÓN
+            DB::transaction(function () use ($id, $servicio) {
+                DB::table('servicios')->where('id', $id)->delete();
 
-            // 3. REGISTRAMOS LA ELIMINACIÓN
-            $this->guardarLog('servicios', 'eliminar', $servicio->nombre, ['id' => $id]);
+                // REGISTRAMOS LA ELIMINACIÓN EN EL LOG
+                $this->guardarLog('servicios', 'eliminar', $servicio->nombre, ['id' => $id]);
+            }); // FIN TRANSACCIÓN
 
             return response()->json([
                 'valid'   => true,

@@ -73,7 +73,6 @@ class DashboardController extends Controller
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();
 
         foreach ($negocios as $negocio) {
-            // Adjuntar Horarios
             $horariosDB = DB::table('horarios_negocios')->where('id_negocio', $negocio->id)->get();
             $horariosArray = [];
             foreach ($horariosDB as $horario) {
@@ -81,7 +80,6 @@ class DashboardController extends Controller
             }
             $negocio->horarios = $horariosArray;
 
-            // Adjuntar Teléfonos
             $telefonosDB = DB::table('numeros_telefonos_negocio')->where('id_negocio', $negocio->id)->get();
             $telefonosArray = [];
             foreach ($telefonosDB as $tel) {
@@ -122,11 +120,10 @@ class DashboardController extends Controller
                 'updated_at' => Carbon::now()
             ];
 
-            // Procesar el nuevo Logo (si viene)
+            // 1. PROCESAMOS EL ARCHIVO FÍSICO PRIMERO (Fuera de la transacción)
             if ($request->hasFile('logo')) {
                 $carpetaDestino = base_path('../uploads/documentos/imagenes/');
 
-                // Borrar logo anterior físicamente si existía
                 if ($negocioMio->logo) {
                     $rutaLogoViejo = base_path('../' . $negocioMio->logo);
                     if (File::exists($rutaLogoViejo)) {
@@ -134,64 +131,66 @@ class DashboardController extends Controller
                     }
                 }
 
-                // Crear carpeta si no existe
                 if (!file_exists($carpetaDestino)) {
                     mkdir($carpetaDestino, 0777, true);
                 }
 
-                // Guardar nuevo logo
                 $archivo = $request->file('logo');
                 $nombreArchivo = 'Foto-logo-' . $id . '-' . date('His') . '.' . $archivo->getClientOriginalExtension();
                 $archivo->move($carpetaDestino, $nombreArchivo);
 
-                // Asignar al arreglo de actualización
                 $updateData['logo'] = 'uploads/documentos/imagenes/' . $nombreArchivo;
             }
 
-            // Ejecutamos la actualización
-            DB::table('negocios')
-                ->where('id', $id)
-                ->update($updateData);
+            // 2. ABRIMOS LA TRANSACCIÓN PARA TODOS LOS MOVIMIENTOS SQL
+            DB::transaction(function () use ($request, $id, $updateData) {
 
-            // ACTUALIZAMOS TELÉFONOS
-            DB::table('numeros_telefonos_negocio')->where('id_negocio', $id)->delete();
-            if ($request->has('telefonos') && is_array($request->telefonos)) {
-                $telefonosInsert = [];
-                foreach($request->telefonos as $tel){
-                    if (!empty($tel['numero'])) {
-                        $telefonosInsert[] = [
-                            'id_negocio' => $id,
-                            'id_tipo_numero_telefono' => $tel['id_tipo'],
-                            'numero_telefono' => $tel['numero'],
-                            'created_at' => Carbon::now(),
-                            'updated_at' => Carbon::now()
-                        ];
+                // Actualizamos datos principales
+                DB::table('negocios')
+                    ->where('id', $id)
+                    ->update($updateData);
+
+                // Reemplazamos teléfonos
+                DB::table('numeros_telefonos_negocio')->where('id_negocio', $id)->delete();
+                if ($request->has('telefonos') && is_array($request->telefonos)) {
+                    $telefonosInsert = [];
+                    foreach($request->telefonos as $tel){
+                        if (!empty($tel['numero'])) {
+                            $telefonosInsert[] = [
+                                'id_negocio' => $id,
+                                'id_tipo_numero_telefono' => $tel['id_tipo'],
+                                'numero_telefono' => $tel['numero'],
+                                'created_at' => Carbon::now(),
+                                'updated_at' => Carbon::now()
+                            ];
+                        }
+                    }
+                    if (count($telefonosInsert) > 0) {
+                        DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
                     }
                 }
-                if (count($telefonosInsert) > 0) {
-                    DB::table('numeros_telefonos_negocio')->insert($telefonosInsert);
-                }
-            }
 
-            // ACTUALIZAMOS HORARIOS
-            DB::table('horarios_negocios')->where('id_negocio', $id)->delete();
-            if ($request->has('horarios') && is_array($request->horarios)) {
-                foreach($request->horarios as $horario){
-                    $horas = explode(' - ', $horario);
-                    if (count($horas) == 2) {
-                        DB::table('horarios_negocios')->insert([
-                            'id_negocio' => $id,
-                            'hora_inicio' => trim($horas[0]),
-                            'hora_fin' => trim($horas[1]),
-                            'created_at' => Carbon::now(),
-                            'updated_at' => Carbon::now()
-                        ]);
+                // Reemplazamos horarios
+                DB::table('horarios_negocios')->where('id_negocio', $id)->delete();
+                if ($request->has('horarios') && is_array($request->horarios)) {
+                    foreach($request->horarios as $horario){
+                        $horas = explode(' - ', $horario);
+                        if (count($horas) == 2) {
+                            DB::table('horarios_negocios')->insert([
+                                'id_negocio' => $id,
+                                'hora_inicio' => trim($horas[0]),
+                                'hora_fin' => trim($horas[1]),
+                                'created_at' => Carbon::now(),
+                                'updated_at' => Carbon::now()
+                            ]);
+                        }
                     }
                 }
-            }
-            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
-            $this->guardarLog('negocios', 'editar', $request->nombre, $request->all());
 
+                // Registramos el log
+                $this->guardarLog('negocios', 'editar', $request->nombre, $request->all());
+
+            }); // FIN DE LA TRANSACCIÓN
 
             return response()->json([
                 'valid' => true,

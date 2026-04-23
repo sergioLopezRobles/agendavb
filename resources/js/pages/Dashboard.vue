@@ -119,6 +119,5 @@ const eventMostrarTodosPlanes = async () => {
                 </div>
             </div>
         </div>
-
     </Layout>
 </template>

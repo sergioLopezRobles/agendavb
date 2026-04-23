@@ -12,7 +12,14 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // 1. Recordatorios de WhatsApp (Se ejecuta CADA MINUTO)
+        $schedule->command('app:recordatorioscitaswhatsapp')->everyMinute();
+
+        // 2. Respaldo Excel Plan Avanzado (Se ejecuta DIARIO a las 12:00 de la noche)
+        $schedule->command('app:respaldocalendario --plan=3')->dailyAt('00:00');
+
+        // 3. Respaldo Excel Plan Medio (Se ejecuta CADA 3 DÍAS a las 12:00 de la noche)
+        $schedule->command('app:respaldocalendario --plan=2')->cron('0 0 */3 * *');
     }
 
     /**
@@ -24,4 +31,6 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
+
+
 }
