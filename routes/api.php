@@ -101,6 +101,9 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Servicios de un negocio específico para Admin
     Route::get('/admin/negocios/{id}/servicios', [NegocioAdminController::class, 'obtenerServiciosNegocio']);
+
+    // Ruta de estadisticas por negocio
+    Route::get('/admin/negocios/{id}/stats', [NegocioAdminController::class, 'obtenerEstadisticasNegocio']);
 });
 
 

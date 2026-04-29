@@ -5,6 +5,13 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { nextTick } from 'vue';
+import { Pie } from 'vue-chartjs';
+import { Chart as ChartJS, Title, Tooltip, Legend, ArcElement, CategoryScale } from 'chart.js';
+
+ChartJS.register(Title, Tooltip, Legend, ArcElement, CategoryScale);
+
+const mostrarModalStats = ref(false);
+const datosStats = ref(null);
 
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
@@ -128,6 +135,52 @@ const cerrarModalServicios = () => {
     serviciosNegocio.value = [];
 };
 
+const chartData = computed(() => {
+    if (!datosStats.value || !datosStats.value.stats.length) return null;
+
+    const labels = [];
+    const counts = [];
+    const backgroundColors = [];
+
+    // Diccionario para que siempre tengan un color fijo según el texto
+    const coloresPorEstado = {
+        'Creada': '#3498db',      // Azul
+        'En Proceso': '#f39c12',  // Naranja
+        'Terminada': '#2ecc71',   // Verde
+        'Cancelada': '#e74c3c'    // Rojo
+    };
+
+    datosStats.value.stats.forEach(s => {
+        labels.push(s.estado);
+        counts.push(s.total);
+        // Si por alguna razón agregan un estado nuevo en la BD, se pone gris por defecto
+        backgroundColors.push(coloresPorEstado[s.estado] || '#95a5a6');
+    });
+
+    return {
+        labels: labels,
+        datasets: [{
+            data: counts,
+            backgroundColor: backgroundColors,
+            borderWidth: 0
+        }]
+    };
+});
+
+const abrirStats = async (negocio) => {
+    negocioSeleccionado.value = negocio;
+    try {
+        const response = await fetch(`/api/admin/negocios/${negocio.id}/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if(data.valid) {
+            datosStats.value = data;
+            mostrarModalStats.value = true;
+        }
+    } catch (error) { window.$toast.show('Error al cargar estadísticas', 'danger', 4000); }
+};
+
 onMounted(() => {
     cargarDatosMenu();
     cargarNegocios();
@@ -219,7 +272,7 @@ onMounted(() => {
                                     <button @click="abrirAgenda(n)" class="btn btn-sm btn-outline-info fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Citas">
                                         <span>📅 Citas</span>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-dark fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Estadísticas">
+                                    <button @click="abrirStats(n)" class="btn btn-sm btn-outline-dark fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Estadísticas">
                                         <span>📊 Stats</span>
                                     </button>
                                 </div>
@@ -340,6 +393,60 @@ onMounted(() => {
                                     </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalStats" class="modal fade show d-block" style="background: rgba(0,0,0,0.6); z-index: 1050;">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content border-0 rounded-4 shadow-lg">
+                    <div class="modal-header border-0 px-4 pt-4">
+                        <h5 class="fw-bold text-dark">Análisis Operativo: {{ negocioSeleccionado?.negocio_nombre }}</h5>
+                        <button type="button" class="btn-close" @click="mostrarModalStats = false"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 rounded-4 text-center">
+                                    <small class="text-primary fw-bold d-block mb-1">CITAS ESTE MES</small>
+                                    <h3 class="fw-bold mb-0 text-primary">{{ datosStats?.totalMes }}</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-success bg-opacity-10 border border-success border-opacity-25 rounded-4 text-center">
+                                    <small class="text-success fw-bold d-block mb-1">INGRESOS (TERMINADAS)</small>
+                                    <h3 class="fw-bold mb-0 text-success">${{ datosStats?.ingresos }}</h3>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-dark bg-opacity-10 border border-dark border-opacity-25 rounded-4 text-center">
+                                    <small class="text-dark fw-bold d-block mb-1">CRÉDITOS WSP</small>
+                                    <h3 class="fw-bold mb-0 text-dark">{{ negocioSeleccionado?.whatsapp_creditos }}</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row align-items-center">
+                            <div class="col-md-6 border-end">
+                                <h6 class="fw-bold text-center mb-3">Distribución de Citas</h6>
+                                <div style="max-height: 250px;">
+                                    <Pie v-if="chartData" :data="chartData" :options="{ responsive: true, maintainAspectRatio: false }" />
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 ps-4">
+                                <h6 class="fw-bold mb-3">🏆 Servicios más solicitados</h6>
+                                <div v-for="(ser, index) in datosStats?.topServicios" :key="index" class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded-3">
+                                    <span class="small fw-bold text-dark">{{ ser.nombre }}</span>
+                                    <span class="badge bg-dark rounded-pill">{{ ser.total }} citas</span>
+                                </div>
+                                <div v-if="datosStats?.topServicios.length === 0" class="text-muted small text-center py-4">
+                                    No hay datos suficientes aún.
+                                </div>
                             </div>
                         </div>
                     </div>
