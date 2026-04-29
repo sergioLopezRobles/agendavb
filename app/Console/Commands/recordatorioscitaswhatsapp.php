@@ -63,11 +63,13 @@ class recordatorioscitaswhatsapp extends Command
                     // Armamos la lista en texto
                     $textoTelefonos = "";
                     if ($telefonosNegocio->isEmpty()) {
-                        $textoTelefonos = "Por favor, contáctanos por nuestros medios oficiales.";
+                        $textoTelefonos = "nuestros medios oficiales";
                     } else {
+                        $arregloTelefonos = [];
                         foreach ($telefonosNegocio as $tel) {
-                            $textoTelefonos .= "• " . $tel->tipo_numero_telefono . ": " . $tel->numero_telefono . "\n";
+                            $arregloTelefonos[] = $tel->tipo_numero_telefono . ": " . $tel->numero_telefono;
                         }
+                        $textoTelefonos = implode(", ", $arregloTelefonos);
                     }
                     // --------------------------------------------------------
 

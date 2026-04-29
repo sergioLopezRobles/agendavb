@@ -38,26 +38,37 @@ const validar = () => {
 const login = async () => {
     if (!validar()) return
 
-    const response = await fetch('/api/login',{
-        method: 'POST',
-        headers: {
-            'Content-Type' : 'application/json'
-        },
-        body: JSON.stringify({
-            email: email.value,
-            password: password.value
+    try {
+        const response = await fetch('/api/login',{
+            method: 'POST',
+            headers: {
+                'Content-Type' : 'application/json'
+            },
+            body: JSON.stringify({
+                email: email.value,
+                password: password.value
+            })
         })
-    })
 
-    const data = await response.json()
+        const data = await response.json()
 
-    if(data.token){
-        localStorage.setItem('token', data.token)
-        // 👇 ESTA ES LA LÍNEA NUEVA MAGICA 👇
-        localStorage.setItem('userEmail', email.value)
+        if(data.valid && data.token){
+            localStorage.setItem('token', data.token)
+            localStorage.setItem('userEmail', email.value)
 
-        window.$toast.show('Bienvenido '  + data.user.name, 'success', 5000)
-        router.push('/dashboard')
+            // 👇 SOLUCIÓN BUG 1: GUARDAMOS EL ROL Y EL PLAN INMEDIATAMENTE 👇
+            localStorage.setItem('userRol', data.user.id_rol.toString())
+            localStorage.setItem('userHasPlan', data.has_plan ? 'true' : 'false')
+            // -------------------------------------------------------------
+
+            window.$toast.show('Bienvenido '  + data.user.name, 'success', 5000)
+            router.push('/dashboard')
+        } else {
+            // Mostramos el mensaje si está suspendido o se equivoca de contraseña
+            window.$toast.show(data.message || 'Error al iniciar sesión', 'danger', 5000)
+        }
+    } catch (error) {
+        window.$toast.show('Error al conectar con el servidor', 'danger', 5000)
     }
 }
 </script>

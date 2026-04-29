@@ -1,117 +1,73 @@
 <script setup>
 import { ref, onMounted, computed, nextTick } from 'vue';
 import Layout from '../componentes/Layout.vue';
-
-// IMPORTACIONES DE FULLCALENDAR
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
-// VARIABLES GLOBALES
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
-
-// ALMACENAR NEGOCIOS
 const negocios = ref([]);
-const estadosCita = ref([]);
-
-// ... tus variables globales existentes ...
 const citasNegocio = ref([]);
 const mostrarModalAgenda = ref(false);
 const negocioSeleccionado = ref(null);
-
-// PARA EL DETALLE DE CITA
 const mostrarModalDetalle = ref(false);
 const citaDetalle = ref(null);
+const descargandoExcel = ref(false);
 
-// AL INICIAR LA PANTALLA
 onMounted(() => {
     cargarDatosMenu();
     cargarDatosCitas();
 });
 
-// MANTIENE EL LAYOUT FUNCIONANDO
 const cargarDatosMenu = async () => {
     try {
         const response = await fetch('/api/dashboard', {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
         if(data.valid) {
             usuarioLoggeado.value = data.usuarioLoggeado;
             planAdquirido.value = data.planAdquirido;
         }
-    } catch (error) {
-        console.error("ERROR AL CARGAR DATOS DEL MENU", error);
-    }
+    } catch (error) { console.error("Error Menu", error); }
 };
 
-// TRAE LOS TICKETS, NEGOCIOS Y CATALOGOS DESDE LARAVEL
 const cargarDatosCitas = async () => {
     try {
         const response = await fetch('/api/citas-negocios', {
             method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
-
-        if(data.valid) {
-            negocios.value = data.negocios;
-            estadosCita.value = data.estados;
-
-            console.log(negocios);
-        }
-    } catch (error) {
-        window.$toast.show('Error al cargar la información de negocios', 'danger', 4000);
-    }
+        if(data.valid) negocios.value = data.negocios;
+    } catch (error) { window.$toast.show('Error al cargar negocios', 'danger', 4000); }
 };
 
-// MAPEO DE EVENTOS PARA FULLCALENDAR
 const eventosCalendario = computed(() => {
     return citasNegocio.value.map(cita => ({
         id: cita.id,
         title: cita.cliente_nombre,
-        start: cita.fecha + 'T' + cita.hora, // Formato ISO: YYYY-MM-DDTHH:mm:ss
-        extendedProps: { ...cita }, // Guardamos toda la info para el detalle
+        start: cita.fecha + 'T' + cita.hora,
+        extendedProps: { ...cita },
         color: '#0d6efd'
     }))
 });
 
-// CONFIGURACIÓN DEL CALENDARIO
 const calendarOptions = ref({
     plugins: [dayGridPlugin, interactionPlugin],
     initialView: 'dayGridMonth',
     locale: 'es',
-    // ESTO ES LO QUE FALTA PARA EL FORMATO
-    eventTimeFormat: {
-        hour: 'numeric',
-        minute: '2-digit',
-        meridiem: 'short', // Esto pone el 'am' o 'pm'
-        hour12: true
-    },
     events: eventosCalendario,
     eventClick: (info) => {
-        // Al hacer clic en un evento (cita existente)
-        citaDetalle.value = { ...info.event.extendedProps };
+        citaDetalle.value = info.event.extendedProps;
         mostrarModalDetalle.value = true;
     },
-    headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: ''
-    }
+    headerToolbar: { left: 'prev,next today', center: 'title', right: '' }
 });
 
-// FUNCIÓN PARA ABRIR LA AGENDA
-/*
 const abrirAgenda = async (negocio) => {
     negocioSeleccionado.value = negocio;
     try {
@@ -122,30 +78,9 @@ const abrirAgenda = async (negocio) => {
         if(data.valid) {
             citasNegocio.value = data.citas;
             mostrarModalAgenda.value = true;
-            // Forzamos el renderizado del calendario después de que el modal sea visible
             await nextTick();
         }
-    } catch (error) {
-        window.$toast.show('Error al cargar la agenda', 'danger', 4000);
-    }
-};*/
-const abrirAgenda = async (negocio) => {
-    negocioSeleccionado.value = negocio;
-    try {
-        const response = await fetch(`/api/citas-negocios/${negocio.id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await response.json();
-        if(data.valid) {
-            citasNegocio.value = data.citas;
-            estadosCita.value = data.estados; // 🔥 ESTA ES LA SOLUCIÓN AL SELECT VACÍO
-            mostrarModalAgenda.value = true;
-            // Forzamos el renderizado del calendario después de que el modal sea visible
-            await nextTick();
-        }
-    } catch (error) {
-        window.$toast.show('Error al cargar la agenda', 'danger', 4000);
-    }
+    } catch (error) { window.$toast.show('Error al cargar agenda', 'danger', 4000); }
 };
 
 const cerrarModalAgenda = () => {
@@ -153,35 +88,68 @@ const cerrarModalAgenda = () => {
     citasNegocio.value = [];
 };
 
-const guardarEstado = async () => {
+// --- FUNCIÓN PARA DESCARGAR EL EXCEL ---
+const descargarExcel = async () => {
+    descargandoExcel.value = true;
     try {
-        const response = await fetch('/api/actualizar-estado-cita', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                id_cita: citaDetalle.value.id,
-                id_estado: citaDetalle.value.id_estado
-            })
+        const response = await fetch('/api/citas-negocios/descargar-excel', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        const data = await response.json();
-        if(data.valid) {
-            window.$toast.show('Estado actualizado correctamente', 'success', 3000);
-            mostrarModalDetalle.value = false;
-            // 🔥 CAMBIAMOS ESTO PARA QUE SE REFRESQUE EL CALENDARIO CORRECTAMENTE
-            abrirAgenda(negocioSeleccionado.value);
+
+        // Si el backend nos rebota (por ej. Error 403 por seguridad), leemos el mensaje de Laravel
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Error en la descarga');
         }
+
+        // Convertimos la respuesta en un archivo Blob (binario)
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Creamos un enlace invisible para forzar la descarga en el navegador
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Agenda_VB_${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Limpiamos
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        window.$toast.show('Excel descargado correctamente', 'success', 3000);
     } catch (error) {
-        console.error("Error:", error);
-        window.$toast.show('Error al actualizar el estado', 'danger', 3000);
+        // Mostramos el error exacto que nos mandó Laravel
+        window.$toast.show(error.message, 'danger', 5000);
+    } finally {
+        descargandoExcel.value = false;
     }
 };
+
 </script>
 
 <template>
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="fw-bold text-dark mb-0">Gestión de Agendas</h4>
+
+            <div class="text-end">
+                <button
+                    @click="descargarExcel"
+                    :disabled="descargandoExcel || !planAdquirido?.puede_descargar_hoy"
+                    class="btn btn-success rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center">
+                    <span v-if="descargandoExcel" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    <span v-else class="fs-5 me-2">📊</span>
+                    {{ descargandoExcel ? 'Generando...' : 'Descargar Excel de 30 Días' }}
+                </button>
+
+                <small v-if="planAdquirido && !planAdquirido.puede_descargar_hoy" class="text-danger mt-1 fw-semibold d-block">
+                    Descarga manual no disponible con tu plan.
+                </small>
+            </div>
+        </div>
+
         <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
@@ -209,7 +177,7 @@ const guardarEstado = async () => {
                         <button type="button" class="btn-close" @click="cerrarModalAgenda"></button>
                     </div>
                     <div class="modal-body p-4">
-                        <div class="calendar-container">
+                        <div class="calendar-container shadow-sm border">
                             <FullCalendar :options="calendarOptions" />
                         </div>
                     </div>
@@ -220,43 +188,30 @@ const guardarEstado = async () => {
         <div v-if="mostrarModalDetalle" class="modal fade show d-block" style="background: rgba(0,0,0,0.4); z-index: 1060;">
             <div class="modal-dialog modal-sm modal-dialog-centered">
                 <div class="modal-content border-0 rounded-4 shadow">
-                    <div class="modal-header border-0">
+                    <div class="modal-header border-0 pb-2">
                         <h6 class="fw-bold mb-0">Detalles de la Cita</h6>
                         <button type="button" class="btn-close" @click="mostrarModalDetalle = false"></button>
                     </div>
                     <div class="modal-body pt-0">
-                        <div class="p-3 bg-light rounded-3">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <p class="mb-1 small text-muted">Cliente:</p>
-                                    <p class="fw-bold mb-2">{{ citaDetalle.cliente_nombre }}</p>
+                        <div class="p-3 bg-light rounded-3 border">
+                            <p class="mb-1 small text-muted fw-semibold">Servicio:</p>
+                            <p class="fw-bold text-primary mb-3">{{ citaDetalle.servicio_nombre || 'No especificado' }}</p>
+
+                            <p class="mb-1 small text-muted">Cliente:</p>
+                            <p class="fw-bold mb-2">{{ citaDetalle.cliente_nombre }}</p>
+
+                            <p class="mb-1 small text-muted">Teléfono:</p>
+                            <p class="mb-3"><a :href="'https://wa.me/52' + citaDetalle.cliente_telefono" target="_blank" class="text-decoration-none text-dark fw-medium">📱 {{ citaDetalle.cliente_telefono }}</a></p>
+
+                            <div class="row g-2 border-top pt-2 mt-2">
+                                <div class="col-6">
+                                    <p class="mb-0 small text-muted">Hora:</p>
+                                    <p class="fw-bold text-dark mb-0">{{ citaDetalle.hora }}</p>
                                 </div>
-                                <div>
-                                    <p class="mb-1 small text-muted">Teléfono:</p>
-                                    <p class="fw-bold mb-2">{{ citaDetalle.cliente_telefono }}</p>
+                                <div class="col-6">
+                                    <p class="mb-0 small text-muted">Fecha:</p>
+                                    <p class="fw-bold text-dark mb-0">{{ citaDetalle.fecha }}</p>
                                 </div>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <p class="mb-1 small text-muted">Hora:</p>
-                                    <p class="fw-bold">{{ citaDetalle.hora }}</p>
-                                </div>
-                                <div>
-                                    <p class="mb-1 small text-muted">Fecha:</p>
-                                    <p class="fw-bold">{{ citaDetalle.fecha }}</p>
-                                </div>
-                            </div>
-                            <div class="mt-3">
-                                <label class="small text-muted">Estado de la cita:</label>
-                                <select class="form-select fw-bold" v-model="citaDetalle.id_estado">
-                                    <option v-for="estado in estadosCita" :key="estado.id" :value="estado.id">
-                                        {{ estado.titulo }}
-                                    </option>
-                                </select>
-                            </div>
-                            <div class="modal-footer mt-3 d-flex justify-content-between">
-                                <!-- <button type="button" class="btn btn-secondary" @click="mostrarModalDetalle = false">Cerrar</button>-->
-                                <button type="button" class="btn btn-primary" @click="guardarEstado">Actualizar Estado</button>
                             </div>
                         </div>
                     </div>
@@ -270,12 +225,9 @@ const guardarEstado = async () => {
 <style scoped>
 .calendar-container {
     background: white;
-    padding: 10px;
+    padding: 15px;
     border-radius: 12px;
 }
-
-/* Ajuste de altura para que el calendario no se desborde del modal */
-:deep(.fc) {
-    max-height: 70vh;
-}
+:deep(.fc) { max-height: 70vh; }
+:deep(.fc-event) { cursor: pointer; border: none; padding: 2px; }
 </style>

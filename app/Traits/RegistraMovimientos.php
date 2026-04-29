@@ -13,15 +13,23 @@ trait RegistraMovimientos
             $tipos_mensaje = ['crear' => 1, 'editar' => 2, 'eliminar' => 3];
             $tipo_mensaje = $tipos_mensaje[$accion] ?? 0;
 
-            // Diccionario para que el mensaje no diga "servicios", sino "Servicio"
             $nombresAmigables = [
                 'negocios'  => 'Negocio',
                 'servicios' => 'Servicio',
                 'citas'     => 'Cita',
                 'tickets'   => 'Ticket',
-                'planes'    => 'Plan'
+                'planes'    => 'Plan',
+                'usuarios'  => 'Usuario'
             ];
             $nombreItem = $nombresAmigables[$tabla] ?? $tabla;
+
+            // 2. Magia: Si modificamos un usuario y nos mandan su ID (número), buscamos su nombre
+            if ($tabla === 'usuarios' && is_numeric($identificador)) {
+                $usuarioAfectado = DB::table('users')->where('id', $identificador)->first();
+                if ($usuarioAfectado) {
+                    $identificador = $usuarioAfectado->name;
+                }
+            }
 
             $textos = [
                 'crear'    => "Creo un nuevo $nombreItem: $identificador",

@@ -13,12 +13,21 @@ const props = defineProps({
 
 // --> leemos la memoria local de forma instantanea para evitar el parpadeo
 const tienePlan = ref(localStorage.getItem('userHasPlan') === 'true');
+const userRol = ref(parseInt(localStorage.getItem('userRol')) || null);
 
-// --> vigilamos cuando la base de datos responda para guardar el dato en memoria
+// --> vigilamos cuando la base de datos responda para guardar el plan en memoria
 watch(() => props.planAdquirido, (nuevoValor) => {
     if (nuevoValor && nuevoValor.id) {
         tienePlan.value = true;
         localStorage.setItem('userHasPlan', 'true');
+    }
+}, { immediate: true });
+
+// --> vigilamos cuando la base de datos responda para guardar el rol en memoria
+watch(() => props.usuarioLoggeado, (nuevoValor) => {
+    if (nuevoValor && nuevoValor.id_rol) {
+        userRol.value = nuevoValor.id_rol;
+        localStorage.setItem('userRol', nuevoValor.id_rol.toString());
     }
 }, { immediate: true });
 
@@ -44,6 +53,7 @@ const logout = async () => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('planSeleccionado');
     localStorage.removeItem('userHasPlan');
+    localStorage.removeItem('userRol');
     router.push('/');
 };
 </script>
@@ -68,37 +78,58 @@ const logout = async () => {
                     </router-link>
                 </li>
 
-                <li v-if="tienePlan" class="nav-item mt-2 pt-2 border-top">
+                <li v-if="userRol === 2 && tienePlan" class="nav-item mt-2 pt-2 border-top">
                     <small class="text-muted fw-bold ms-3 menu-text d-block mb-1" style="font-size: 0.75rem;">MÓDULOS</small>
                 </li>
 
-                <li v-if="tienePlan" class="nav-item">
-                    <router-link to="/negocios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/negocios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
-                        <span class="fs-4 icon-menu me-3">🏪</span>
-                        <span class="menu-text fw-medium">Mis Negocios</span>
-                    </router-link>
-                </li>
+                <template v-if="userRol === 2 && tienePlan">
+                    <li class="nav-item">
+                        <router-link to="/negocios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/negocios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">🏪</span>
+                            <span class="menu-text fw-medium">Mis Negocios</span>
+                        </router-link>
+                    </li>
 
-                <li v-if="tienePlan" class="nav-item">
-                    <a href="/citas-negocios" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
-                        <span class="fs-4 icon-menu me-3">📆</span>
-                        <span class="menu-text fw-medium">Agenda Digital</span>
-                    </a>
-                </li>
+                    <li class="nav-item">
+                        <router-link to="/citas-negocios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/citas-negocios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">📆</span>
+                            <span class="menu-text fw-medium">Agenda Digital</span>
+                            </router-link>
+                    </li>
 
-                <li v-if="tienePlan" class="nav-item">
-                    <a href="#" class="nav-link text-dark rounded-3 d-flex align-items-center py-2 px-3 hover-bg-light">
-                        <span class="fs-4 icon-menu me-3">👥</span>
-                        <span class="menu-text fw-medium">Usuarios y Roles</span>
-                    </a>
-                </li>
+                    <li v-if="userRol === 2" class="nav-item">
+                        <router-link to="/soporte" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/soporte' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">🎧</span>
+                            <span class="menu-text fw-medium">Mis Tickets</span>
+                        </router-link>
+                    </li>
+                </template>
 
-                <li v-if="tienePlan" class="nav-item">
-                    <router-link to="/soporte" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/soporte' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
-                        <span class="fs-4 icon-menu me-3">🎧</span>
-                        <span class="menu-text fw-medium">Soporte / Tickets</span>
-                    </router-link>
-                </li>
+                <template v-if="userRol === 1">
+                    <li class="nav-item mt-2 pt-2 border-top">
+                        <small class="text-danger fw-bold ms-3 menu-text d-block mb-1" style="font-size: 0.75rem;">PANEL ADMIN</small>
+                    </li>
+
+                    <li class="nav-item">
+                        <router-link to="/admin-usuarios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/admin-usuarios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">👥</span>
+                            <span class="menu-text fw-medium">Usuarios y Roles</span>
+                        </router-link>
+                    </li>
+
+                    <li class="nav-item">
+                        <router-link to="/admin-soporte" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/admin-soporte' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">🛠️</span>
+                            <span class="menu-text fw-medium">Bandeja de Tickets</span>
+                        </router-link>
+                    </li>
+                    <li class="nav-item">
+                        <router-link to="/admin-auditoria" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/admin-auditoria' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">🛡️</span>
+                            <span class="menu-text fw-medium">Auditoría y Logs</span>
+                        </router-link>
+                    </li>
+                </template>
             </ul>
         </div>
 

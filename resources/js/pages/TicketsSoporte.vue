@@ -1,106 +1,66 @@
 <script setup>
-/**
- * Componente de página para la gestión de Tickets de Soporte.
- *
- * Permite a los usuarios (y administradores) ver, crear, filtrar y
- * actualizar el estado de los tickets de soporte asociados a sus negocios.
- */
 import { ref, reactive, onMounted, computed } from 'vue';
 import Layout from '../componentes/Layout.vue';
 
 // ── State ──────────────────────────────────────────────────────────────────────
-
-// Estado global y de autenticación
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
 
-// Datos de la API
 const tickets = ref([]);
-const prioridadesTicket = ref([]);
 const estadosTicket = ref([]);
 const misNegocios = ref([]);
 const preguntasFrecuentes = ref([]);
 
 const preguntasOrdenadas = computed(() => {
-    // Hacemos una copia para no afectar el estado original
     return [...preguntasFrecuentes.value].sort((a, b) => {
-        if (a.id == 0) return 1;  // Si 'a' es 0, lo manda al final
-        if (b.id == 0) return -1; // Si 'b' es 0, lo manda al final
-        return a.id - b.id;       // Los demás los ordena normal
+        if (a.id == 0) return 1;
+        if (b.id == 0) return -1;
+        return a.id - b.id;
     });
 });
 
-// Estado de UI y filtros
 const buscar = ref('');
 const filtroEstado = ref('');
-const filtroPrioridad = ref('');
 
-// Estado para el modal de "Nuevo Ticket"
 const mostrarModalTicket = ref(false);
-const formularioTicket = reactive({
-    id_negocio: '',
-    id_pregunta: '',
-    asunto: ''
-});
+const enviandoTicket = ref(false); // <-- NUEVA VARIABLE ANTI-DOBLE CLIC
+const formularioTicket = reactive({ id_negocio: '', id_pregunta: '', asunto: '' });
 const errores = reactive({});
 
-// Estado para el modal de "Revisar Ticket"
 const mostrarModalRevisar = ref(false);
-const ticketRevisar = reactive({
-    id: '',
-    asunto: '',
-    negocio_nombre: '',
-    id_prioridad: '',
-    id_estado: ''
-});
+const ticketRevisar = reactive({ id: '', asunto: '', negocio_nombre: '', estado_nombre: '', fecha: '' });
 
-// ── API Calls & Data Loading ───────────────────────────────────────────────────
-
-// Carga los datos del usuario para el Layout (menú, plan, etc.)
+// ── API Calls ──────────────────────────────────────────────────────────────────
 const cargarDatosMenu = async () => {
     try {
         const response = await fetch('/api/dashboard', {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
         if (data.valid) {
             usuarioLoggeado.value = data.usuarioLoggeado;
             planAdquirido.value = data.planAdquirido;
         }
-    } catch (error) {
-        console.error("ERROR AL CARGAR DATOS DEL MENU", error);
-    }
+    } catch (error) { console.error("Error menu", error); }
 };
 
-// Carga todos los datos relacionados con los tickets (tickets, catálogos, negocios del usuario)
 const cargarDatosTickets = async () => {
     try {
         const response = await fetch('/api/tickets', {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
         if (data.valid) {
             tickets.value = data.tickets;
-            prioridadesTicket.value = data.prioridades;
             estadosTicket.value = data.estados;
             misNegocios.value = data.negocios;
             preguntasFrecuentes.value = data.preguntas;
         }
-    } catch (error) {
-        window.$toast.show('Error al cargar la información de tickets', 'danger', 4000);
-    }
+    } catch (error) { window.$toast.show('Error al cargar tickets', 'danger', 4000); }
 };
 
 // ── Computed ───────────────────────────────────────────────────────────────────
-
-// Filtra la lista de tickets en tiempo real según los inputs de búsqueda y los selects de filtro.
 const ticketsFiltrados = computed(() => {
     return tickets.value.filter(ticket => {
         const coincideTexto = ticket.id.toLowerCase().includes(buscar.value.toLowerCase()) ||
@@ -109,15 +69,12 @@ const ticketsFiltrados = computed(() => {
             (ticket.pregunta_nombre && ticket.pregunta_nombre.toLowerCase().includes(buscar.value.toLowerCase()));
 
         const coincideEstado = filtroEstado.value === '' || (ticket.id_estado && ticket.id_estado.toString() === filtroEstado.value);
-        const coincidePrioridad = filtroPrioridad.value === '' || (ticket.id_prioridad && ticket.id_prioridad.toString() === filtroPrioridad.value);
 
-        return coincideTexto && coincideEstado && coincidePrioridad;
+        return coincideTexto && coincideEstado;
     });
 });
 
-// ── Modal & Form Logic (Create Ticket) ────────────────────────────────────────
-
-// Abre el modal para crear un nuevo ticket, reseteando el formulario y los errores.
+// ── Modal Crear Ticket ────────────────────────────────────────────────────────
 const abrirModalTicket = () => {
     Object.keys(errores).forEach(key => delete errores[key]);
     formularioTicket.id_negocio = '';
@@ -126,63 +83,43 @@ const abrirModalTicket = () => {
     mostrarModalTicket.value = true;
 };
 
-// Cierra el modal de creación de ticket.
 const cerrarModalTicket = () => {
-    mostrarModalTicket.value = false;
+    if(!enviandoTicket.value) mostrarModalTicket.value = false;
 };
 
-// Valida y envía el formulario para crear un nuevo ticket a la API.
-// GUARDAR EL NUEVO TICKET
 const guardarTicket = async () => {
+    // Si ya se está enviando, ignoramos clics extra
+    if (enviandoTicket.value) return;
+
     Object.keys(errores).forEach(key => delete errores[key]);
     let esValido = true;
 
-    if (!formularioTicket.id_negocio) {
-        errores.id_negocio = 'Debes seleccionar un negocio.';
-        esValido = false;
-    }
-
-    if (formularioTicket.id_pregunta === '') {
-        errores.id_pregunta = 'Debes seleccionar un tipo de problema.';
-        esValido = false;
-    }
-
-    // Validación si eligió "Otro" (0)
-    if (formularioTicket.id_pregunta == 0 && !formularioTicket.asunto.trim()) {
-        errores.asunto = 'Por favor, describe tu problema detalladamente.';
-        esValido = false;
-    }
+    if (!formularioTicket.id_negocio) { errores.id_negocio = 'Selecciona un negocio.'; esValido = false; }
+    if (formularioTicket.id_pregunta === '') { errores.id_pregunta = 'Selecciona un problema.'; esValido = false; }
+    if (formularioTicket.id_pregunta == 0 && !formularioTicket.asunto.trim()) { errores.asunto = 'Describe tu problema.'; esValido = false; }
 
     if (!esValido) return;
 
-    // ---> SOLUCIÓN: PREPARAR UN PAYLOAD SEGURO <---
+    // Bloqueamos el botón
+    enviandoTicket.value = true;
+
     let asuntoFinal = formularioTicket.asunto;
-
-    // Si NO eligió "Otro", le inyectamos el texto de la pregunta seleccionada
     if (formularioTicket.id_pregunta != 0) {
-        // Usamos == para evitar problemas de tipos (String vs Number)
-        const preguntaSeleccionada = preguntasOrdenadas.value.find(p => p.id == formularioTicket.id_pregunta);
-        asuntoFinal = preguntaSeleccionada ? preguntaSeleccionada.pregunta : 'Soporte General';
+        const pSel = preguntasOrdenadas.value.find(p => p.id == formularioTicket.id_pregunta);
+        asuntoFinal = pSel ? pSel.pregunta : 'Soporte General';
     }
-
-    console.log("Enviando a Laravel -> Pregunta ID:", formularioTicket.id_pregunta, "| Asunto Final:", asuntoFinal);
 
     try {
         const response = await fetch('/api/tickets', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({
                 id_negocio: formularioTicket.id_negocio,
                 id_pregunta: formularioTicket.id_pregunta,
                 asunto: asuntoFinal
             })
         });
-
         const data = await response.json();
-
         if(data.valid) {
             window.$toast.show(data.message, 'success', 4000);
             cerrarModalTicket();
@@ -191,63 +128,25 @@ const guardarTicket = async () => {
             window.$toast.show(data.message, 'warning', 4000);
         }
     } catch (error) {
-        window.$toast.show('Error al crear el ticket', 'danger', 4000);
+        window.$toast.show('Error al crear ticket', 'danger', 4000);
+    } finally {
+        // Liberamos el botón pase lo que pase
+        enviandoTicket.value = false;
     }
 };
 
-// ── Modal & Form Logic (Review Ticket) ────────────────────────────────────────
-
-// Abre el modal para revisar/actualizar un ticket existente.
+// ── Modal Ver Detalles (Solo Lectura) ─────────────────────────────────────────
 const verTicket = (ticket) => {
     ticketRevisar.id = ticket.id;
     ticketRevisar.asunto = (ticket.id_pregunta == 0) ? ticket.asunto : ticket.pregunta_nombre;
     ticketRevisar.negocio_nombre = ticket.negocio_nombre;
-    ticketRevisar.id_prioridad = ticket.id_prioridad || '';
-    ticketRevisar.id_estado = ticket.id_estado;
+    ticketRevisar.estado_nombre = ticket.estado_nombre;
+    ticketRevisar.fecha = ticket.fecha;
     mostrarModalRevisar.value = true;
 };
 
-// Cierra el modal de revisión de ticket.
-const cerrarModalRevisar = () => {
-    mostrarModalRevisar.value = false;
-};
+const cerrarModalRevisar = () => mostrarModalRevisar.value = false;
 
-// Envía los cambios de estado y prioridad de un ticket a la API.
-const actualizarTicket = async () => {
-    if (!ticketRevisar.id_prioridad || !ticketRevisar.id_estado) {
-        window.$toast.show('Debes seleccionar prioridad y estado', 'warning', 3000);
-        return;
-    }
-
-    try {
-        const response = await fetch(`/api/tickets/${ticketRevisar.id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                id_prioridad: ticketRevisar.id_prioridad,
-                id_estado: ticketRevisar.id_estado
-            })
-        });
-
-        const data = await response.json();
-        if (data.valid) {
-            window.$toast.show(data.message, 'success', 4000);
-            cerrarModalRevisar();
-            cargarDatosTickets();
-        } else {
-            window.$toast.show(data.message, 'warning', 4000);
-        }
-    } catch (error) {
-        window.$toast.show('Error al actualizar el ticket', 'danger', 4000);
-    }
-};
-
-// ── Lifecycle Hooks ───────────────────────────────────────────────────────────
-
-// Al montar el componente, se cargan los datos iniciales.
 onMounted(() => {
     cargarDatosMenu();
     cargarDatosTickets();
@@ -258,11 +157,11 @@ onMounted(() => {
     <Layout :usuarioLoggeado="usuarioLoggeado" :planAdquirido="planAdquirido">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h4 class="fw-bold mb-0 text-dark">Centro de Soporte</h4>
-                <p class="text-muted small mb-0">Gestión y resolución de tickets de clientes</p>
+                <h4 class="fw-bold mb-0 text-dark">Mis Tickets de Soporte</h4>
+                <p class="text-muted small mb-0">Comunícate con el administrador para resolver dudas</p>
             </div>
             <button @click="abrirModalTicket" class="btn btn-primary rounded-pill px-4 shadow-sm fw-semibold d-flex align-items-center">
-                <span class="fs-5 me-2">+</span> Nuevo Ticket
+                <span class="fs-5 me-2">+</span> Levantar Ticket
             </button>
         </div>
 
@@ -270,7 +169,7 @@ onMounted(() => {
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-primary h-100">
                     <div class="card-body">
-                        <h6 class="text-muted fw-bold mb-1">Total Tickets</h6>
+                        <h6 class="text-muted fw-bold mb-1">Mis Tickets</h6>
                         <h3 class="fw-bold mb-0 text-dark">{{ tickets.length }}</h3>
                     </div>
                 </div>
@@ -278,7 +177,7 @@ onMounted(() => {
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-danger h-100">
                     <div class="card-body">
-                        <h6 class="text-muted fw-bold mb-1">Abiertos</h6>
+                        <h6 class="text-muted fw-bold mb-1">En espera</h6>
                         <h3 class="fw-bold mb-0 text-danger">{{ tickets.filter(t => t.id_estado == '1').length }}</h3>
                     </div>
                 </div>
@@ -286,7 +185,7 @@ onMounted(() => {
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-warning h-100">
                     <div class="card-body">
-                        <h6 class="text-muted fw-bold mb-1">En Progreso</h6>
+                        <h6 class="text-muted fw-bold mb-1">Revisando</h6>
                         <h3 class="fw-bold mb-0 text-warning">{{ tickets.filter(t => t.id_estado == '2').length }}</h3>
                     </div>
                 </div>
@@ -294,7 +193,7 @@ onMounted(() => {
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 rounded-4 border-start border-4 border-success h-100">
                     <div class="card-body">
-                        <h6 class="text-muted fw-bold mb-1">Resueltos</h6>
+                        <h6 class="text-muted fw-bold mb-1">Finalizados</h6>
                         <h3 class="fw-bold mb-0 text-success">{{ tickets.filter(t => t.id_estado == '3').length }}</h3>
                     </div>
                 </div>
@@ -307,16 +206,10 @@ onMounted(() => {
                     <div class="col-md-4">
                         <div class="input-group shadow-sm rounded-3">
                             <span class="input-group-text bg-white border-end-0 text-muted">🔍</span>
-                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar por ID, asunto, cliente o negocio...">
+                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar ticket...">
                         </div>
                     </div>
                     <div class="col-md-8 text-end">
-                        <select v-model="filtroPrioridad" class="form-select w-auto d-inline-block shadow-sm border-2 bg-light me-3">
-                            <option value="">Cualquier Prioridad</option>
-                            <option v-for="prioridad in prioridadesTicket" :key="prioridad.id" :value="prioridad.id.toString()">
-                                {{ prioridad.descripcion }}
-                            </option>
-                        </select>
                         <select v-model="filtroEstado" class="form-select w-auto d-inline-block shadow-sm border-2 bg-light">
                             <option value="">Cualquier Estado</option>
                             <option v-for="estado in estadosTicket" :key="estado.id" :value="estado.id.toString()">
@@ -332,12 +225,11 @@ onMounted(() => {
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
                         <tr>
-                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">ID Ticket</th>
-                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Asunto / Negocio</th>
-                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Prioridad</th>
+                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Folio</th>
+                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Problema</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Estado</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Fecha</th>
-                            <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0">Acción</th>
+                            <th class="py-3 px-4 text-end text-secondary fw-semibold border-bottom-0"></th>
                         </tr>
                         </thead>
                         <tbody>
@@ -352,17 +244,6 @@ onMounted(() => {
                             <td class="px-4 py-3 text-center">
                                     <span class="badge rounded-pill"
                                           :class="{
-                                            'bg-danger bg-opacity-10 text-danger': ticket.prioridad_nombre === 'Alta',
-                                            'bg-warning bg-opacity-10 text-dark': ticket.prioridad_nombre === 'Media',
-                                            'bg-secondary bg-opacity-10 text-secondary': ticket.prioridad_nombre === 'Baja',
-                                            'bg-light text-dark border': !ticket.prioridad_nombre
-                                        }">
-                                        {{ ticket.prioridad_nombre || 'Por definir' }}
-                                    </span>
-                            </td>
-                            <td class="px-4 py-3 text-center">
-                                    <span class="badge rounded-pill"
-                                          :class="{
                                             'bg-primary': ticket.estado_nombre === 'Pendiente',
                                             'bg-warning text-dark': ticket.estado_nombre === 'En proceso',
                                             'bg-success': ticket.estado_nombre === 'Resuelto'
@@ -372,13 +253,11 @@ onMounted(() => {
                             </td>
                             <td class="px-4 py-3 text-muted small">{{ ticket.fecha }}</td>
                             <td class="px-4 py-3 text-end">
-                                <button class="btn btn-sm btn-light fw-bold text-primary rounded-3 px-3">
-                                    Revisar
-                                </button>
+                                <button class="btn btn-sm btn-light fw-bold text-primary rounded-3 px-3">Ver</button>
                             </td>
                         </tr>
                         <tr v-if="ticketsFiltrados.length === 0">
-                            <td colspan="6" class="text-center py-5 text-muted">No se encontraron tickets.</td>
+                            <td colspan="5" class="text-center py-5 text-muted">No has levantado ningún ticket.</td>
                         </tr>
                         </tbody>
                     </table>
@@ -391,41 +270,36 @@ onMounted(() => {
                 <div class="modal-content border-0 shadow-lg rounded-4">
                     <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
                         <h5 class="modal-title fw-bold text-dark">🎧 Nuevo Ticket de Soporte</h5>
-                        <button type="button" class="btn-close shadow-none" @click="cerrarModalTicket"></button>
+                        <button type="button" class="btn-close shadow-none" :disabled="enviandoTicket" @click="cerrarModalTicket"></button>
                     </div>
-
                     <div class="modal-body px-4 py-4">
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">¿Para qué negocio es?</label>
-                            <select v-model="formularioTicket.id_negocio" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_negocio}">
+                            <select v-model="formularioTicket.id_negocio" :disabled="enviandoTicket" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_negocio}">
                                 <option value="" disabled>Selecciona tu negocio...</option>
-                                <option v-for="negocio in misNegocios" :key="negocio.id" :value="negocio.id">
-                                    {{ negocio.nombre }}
-                                </option>
+                                <option v-for="negocio in misNegocios" :key="negocio.id" :value="negocio.id">{{ negocio.nombre }}</option>
                             </select>
                             <div class="invalid-feedback fw-medium">{{ errores.id_negocio }}</div>
                         </div>
-
                         <div class="mb-3">
                             <label class="form-label fw-semibold text-secondary">¿Cuál es el problema?</label>
-                            <select v-model="formularioTicket.id_pregunta" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_pregunta}">
+                            <select v-model="formularioTicket.id_pregunta" :disabled="enviandoTicket" class="form-select form-select-lg bg-light border-0 shadow-sm" :class="{'is-invalid': errores.id_pregunta}">
                                 <option value="" disabled>Selecciona una opción...</option>
-                                <option v-for="pregunta in preguntasOrdenadas" :key="pregunta.id" :value="pregunta.id">
-                                    {{ pregunta.pregunta }}
-                                </option>
+                                <option v-for="pregunta in preguntasOrdenadas" :key="pregunta.id" :value="pregunta.id">{{ pregunta.pregunta }}</option>
                             </select>
                             <div class="invalid-feedback fw-medium">{{ errores.id_pregunta }}</div>
                         </div>
-
                         <div class="mb-3" v-if="formularioTicket.id_pregunta == 0 && formularioTicket.id_pregunta !== ''">
                             <label class="form-label fw-semibold text-secondary">Describe tu problema detalladamente</label>
-                            <textarea v-model="formularioTicket.asunto" rows="3" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Explícanos qué sucede..." :class="{'is-invalid': errores.asunto}"></textarea>
+                            <textarea v-model="formularioTicket.asunto" :disabled="enviandoTicket" rows="3" class="form-control form-control-lg bg-light border-0 shadow-sm" placeholder="Explícanos qué sucede..." :class="{'is-invalid': errores.asunto}"></textarea>
                             <div class="invalid-feedback fw-medium">{{ errores.asunto }}</div>
                         </div>
                     </div>
-
                     <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarTicket">Levantar Ticket</button>
+                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="guardarTicket" :disabled="enviandoTicket">
+                            <span v-if="enviandoTicket" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            {{ enviandoTicket ? 'Procesando...' : 'Levantar Ticket' }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -435,38 +309,26 @@ onMounted(() => {
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
                     <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
-                        <h5 class="modal-title fw-bold text-dark">Revisar Ticket {{ ticketRevisar.id }}</h5>
+                        <h5 class="modal-title fw-bold text-dark">Detalles del Ticket {{ ticketRevisar.id }}</h5>
                         <button type="button" class="btn-close shadow-none" @click="cerrarModalRevisar"></button>
                     </div>
-
                     <div class="modal-body px-4 py-4">
                         <div class="mb-4 p-3 bg-light rounded-3 border">
                             <p class="text-muted small mb-1">Negocio: <span class="fw-bold text-dark">{{ ticketRevisar.negocio_nombre }}</span></p>
-                            <p class="text-muted small mb-0">Asunto: <span class="fw-bold text-dark">{{ ticketRevisar.asunto }}</span></p>
+                            <p class="text-muted small mb-1">Fecha de creación: <span class="fw-bold text-dark">{{ ticketRevisar.fecha }}</span></p>
+                            <p class="text-muted small mb-0">Detalle: <span class="fw-bold text-dark">{{ ticketRevisar.asunto }}</span></p>
                         </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">Asignar Prioridad</label>
-                            <select v-model="ticketRevisar.id_prioridad" class="form-select form-select-lg bg-light border-0 shadow-sm">
-                                <option value="" disabled>Selecciona la prioridad...</option>
-                                <option v-for="prioridad in prioridadesTicket" :key="prioridad.id" :value="prioridad.id">
-                                    {{ prioridad.descripcion }}
-                                </option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold text-secondary">Actualizar Estado</label>
-                            <select v-model="ticketRevisar.id_estado" class="form-select form-select-lg bg-light border-0 shadow-sm">
-                                <option v-for="estado in estadosTicket" :key="estado.id" :value="estado.id">
-                                    {{ estado.descripcion }}
-                                </option>
-                            </select>
+                        <div class="row justify-content-center">
+                            <div class="col-8">
+                                <div class="p-3 border rounded-3 text-center">
+                                    <p class="text-muted small mb-1">Estado Actual</p>
+                                    <h6 class="fw-bold mb-0 text-primary">{{ ticketRevisar.estado_nombre }}</h6>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary w-100 py-3 fw-bold fs-6 rounded-3" @click="actualizarTicket">Actualizar Ticket</button>
+                    <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-center">
+                        <button type="button" class="btn btn-secondary w-100 py-3 fw-bold fs-6 rounded-3" @click="cerrarModalRevisar">Cerrar Detalles</button>
                     </div>
                 </div>
             </div>

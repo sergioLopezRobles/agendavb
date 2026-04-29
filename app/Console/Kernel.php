@@ -15,11 +15,9 @@ class Kernel extends ConsoleKernel
         // 1. Recordatorios de WhatsApp (Se ejecuta CADA MINUTO)
         $schedule->command('app:recordatorioscitaswhatsapp')->everyMinute();
 
-        // 2. Respaldo Excel Plan Avanzado (Se ejecuta DIARIO a las 12:00 de la noche)
-        $schedule->command('app:respaldocalendario --plan=3')->dailyAt('00:00');
+        // 2. Esto ejecuta el respaldo todos los días exactamente a las 12:00 PM (Mediodía)
+        $schedule->command('app:respaldocalendario')->dailyAt('00:00');
 
-        // 3. Respaldo Excel Plan Medio (Se ejecuta CADA 3 DÍAS a las 12:00 de la noche)
-        $schedule->command('app:respaldocalendario --plan=2')->cron('0 0 */3 * *');
     }
 
     /**

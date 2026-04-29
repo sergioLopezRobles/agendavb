@@ -18,19 +18,95 @@ class DashboardController extends Controller
     public function index(){
         $idUsuario = Auth::id();
 
+        // 1. Obtenemos al usuario con su plan y su rol
         $usuarioLoggeado = DB::table('users as u')
             ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
-            ->select('pu.id_plan', 'u.email', 'u.name')
+            ->leftJoin('roles_usuarios as ru', 'u.id', '=', 'ru.id_usuario')
+            ->select('pu.id_plan', 'u.email', 'u.name', 'ru.id_rol')
             ->where('u.id', $idUsuario)
             ->first();
 
-        $cantidadNegocios = DB::table('negocios')->where('id_usuario', $idUsuario)->count();
+        // Forzamos Rol Dueño si no tiene
+        if ($usuarioLoggeado && $usuarioLoggeado->id_rol == null) {
+            $usuarioLoggeado->id_rol = 2;
+        }
 
         if($usuarioLoggeado != null){
+
+            // =========================================================
+            // LÓGICA PARA EL ADMINISTRADOR (ROL 1)
+            // =========================================================
+            if ($usuarioLoggeado->id_rol == 1) {
+
+                // 1. Cálculo del MRR (Sumamos el valor del plan de los usuarios activos)
+                $mrr = DB::table('plan_usuarios')
+                    ->join('caracteristicasplanes', 'plan_usuarios.id_plan', '=', 'caracteristicasplanes.id_plan')
+                    ->where('caracteristicasplanes.titulo', 'precio')
+                    ->sum(DB::raw('CAST(caracteristicasplanes.valor AS DECIMAL(10,2))'));
+
+                // 2. Uso del sistema (Total de citas procesadas)
+                // Cambia 'citas_negocios' si tu tabla se llama distinto
+                $totalCitas = DB::table('citas')->count();
+
+                // 3. Auditoría: Obtenemos los últimos 15 logs
+                $logsData = DB::table('movimientos_usuarios as m')
+                    ->join('users as u', 'm.id_usuario', '=', 'u.id')
+                    ->select('m.id', 'u.name as usuario_nombre', 'm.cambios', 'm.tipo_mensaje', DB::raw("DATE_FORMAT(m.created_at, '%d/%m/%Y %H:%i') as fecha"))
+                    ->orderBy('m.created_at', 'desc')
+                    ->limit(15)
+                    ->get()
+                    ->map(function ($log) {
+                        // Decodificamos el JSON que guardaste desde tu Trait
+                        $log->cambios = json_decode($log->cambios);
+                        return $log;
+                    });
+
+                $statsAdmin = [
+                    'total_usuarios' => DB::table('users')->count(),
+                    'total_negocios' => DB::table('negocios')->count(),
+                    'suscripciones_activas' => DB::table('plan_usuarios')->count(),
+                    'tickets_pendientes' => DB::table('ticket_soporte_usuarios_negocios')->whereIn('id_estado', [1, 2])->count(),
+                    'ingresos_mrr' => $mrr,
+                    'total_citas' => $totalCitas,
+                    'logs' => $logsData
+                ];
+
+                return response()->json([
+                    'valid' => true,
+                    'usuarioLoggeado' => $usuarioLoggeado,
+                    'planAdquirido' => null,
+                    'statsAdmin' => $statsAdmin
+                ]);
+            }
+
+            // =========================================================
+            // LÓGICA PARA EL DUEÑO (ROL 2)
+            // =========================================================
+            $cantidadNegocios = DB::table('negocios')->where('id_usuario', $idUsuario)->count();
+
+            $hoy = \Carbon\Carbon::now()->format('Y-m-d');
+            $citasHoy = DB::table('citas')
+            ->join('negocios', 'citas.id_negocio', '=', 'negocios.id')
+                ->where('negocios.id_usuario', $idUsuario)
+                ->where('citas.fecha', $hoy)
+                ->count();
+            // --------------------------------------------------
+
             if($usuarioLoggeado->id_plan != null){
-                $globalFuncion = new GlobalFuncion();
+                $globalFuncion = new \App\Clases\GlobalFuncion();
                 $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
                 $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
+
+                // --- LÓGICA RECUPERADA: VALIDACIÓN DEL DÍA PARA EL EXCEL ---
+                $hoy = \Carbon\Carbon::now()->dayOfWeek; // 0 (Domingo) a 6 (Sábado)
+                if (isset($planAdquirido->dias_respaldo_calendario) && $planAdquirido->dias_respaldo_calendario !== null) {
+                    $cadenaLimpia = str_replace(' ', '', $planAdquirido->dias_respaldo_calendario);
+                    $diasPermitidos = explode(',', $cadenaLimpia);
+                    $planAdquirido->puede_descargar_hoy = in_array((string)$hoy, $diasPermitidos);
+                } else {
+                    $planAdquirido->puede_descargar_hoy = false;
+                }
+                // ------------------------------------------------------------
 
                 return response()->json([
                     'valid' => true,
@@ -39,20 +115,10 @@ class DashboardController extends Controller
                     'cantidadNegocios' => $cantidadNegocios,
                     'prioridadesTicket' => $prioridadesTicket
                 ]);
-            }else{
-                return response()->json([
-                    'valid' => true,
-                    'planAdquirido' => null,
-                    'usuarioLoggeado' => $usuarioLoggeado,
-                    'cantidadNegocios' => $cantidadNegocios
-                ]);
             }
         }
 
-        return response()->json([
-            'valid' => false,
-            'planAdquirido' => null,
-        ]);
+        return response()->json(['valid' => false, 'planAdquirido' => null]);
     }
 
     public function misNegocios(Request $request){
@@ -60,14 +126,30 @@ class DashboardController extends Controller
 
         $usuarioLoggeado = DB::table('users as u')
             ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
-            ->select('u.name', 'u.email', 'pu.id_plan')
+            ->leftJoin('roles_usuarios as ru', 'u.id', '=', 'ru.id_usuario')
+            ->select('pu.id_plan', 'u.email', 'u.name', 'ru.id_rol')
             ->where('u.id', $idUsuario)
             ->first();
+
+        // Si por alguna razón el usuario no tiene rol registrado, forzamos que sea Dueño (2)
+        if ($usuarioLoggeado && $usuarioLoggeado->id_rol == null) {
+            $usuarioLoggeado->id_rol = 2;
+        }
 
         $planAdquirido = null;
         if($usuarioLoggeado && $usuarioLoggeado->id_plan) {
             $globalFuncion = new GlobalFuncion();
             $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
+
+            // --- REPETIMOS LA LÓGICA AQUÍ POR SI EL FRONTEND USA ESTA RUTA ---
+            $hoy = Carbon::now()->dayOfWeek;
+            if (isset($planAdquirido->dias_respaldo_calendario) && $planAdquirido->dias_respaldo_calendario !== null) {
+                $diasPermitidos = explode(',', $planAdquirido->dias_respaldo_calendario);
+                $planAdquirido->puede_descargar_hoy = in_array((string)$hoy, $diasPermitidos);
+            } else {
+                $planAdquirido->puede_descargar_hoy = false;
+            }
+            // ------------------------------------------------------
         }
 
         $negocios = DB::table('negocios')->where('id_usuario', $idUsuario)->get();

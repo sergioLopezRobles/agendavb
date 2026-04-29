@@ -54,6 +54,40 @@ class TicketController extends Controller
         ]);
     }
 
+    // --- FUNCIÓN EXCLUSIVA PARA EL ADMINISTRADOR ---
+    public function indexAdmin()
+    {
+        $prioridades = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
+        $estados     = DB::table('estado_ticket_soporte_usuarios_negocios')->get();
+
+        // Aquí NO filtramos por usuario, traemos absolutamente todos los tickets
+        $tickets = DB::table('ticket_soporte_usuarios_negocios as t')
+            ->join('negocios as n', 't.id_negocio', '=', 'n.id')
+            ->leftJoin('prioridad_ticket_soporte_usuarios_negocios as p', 't.id_prioridad', '=', 'p.id')
+            ->join('estado_ticket_soporte_usuarios_negocios as e', 't.id_estado', '=', 'e.id')
+            ->leftJoin('preguntas_frecuentes_ticket as f', 't.id_pregunta', '=', 'f.id')
+            ->select(
+                't.id',
+                't.asunto',
+                't.id_estado',
+                't.id_prioridad',
+                'n.nombre as negocio_nombre',
+                'p.descripcion as prioridad_nombre',
+                'e.descripcion as estado_nombre',
+                'f.pregunta as pregunta_nombre',
+                DB::raw("DATE_FORMAT(t.created_at, '%d/%m/%Y') as fecha")
+            )
+            ->orderBy('t.created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'valid'       => true,
+            'tickets'     => $tickets,
+            'prioridades' => $prioridades,
+            'estados'     => $estados
+        ]);
+    }
+
     public function store(Request $request)
     {
         try {

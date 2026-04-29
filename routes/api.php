@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\servicios\ServicioController;
 use App\Http\Controllers\ticket\TicketController;
 use App\Http\Controllers\stripecard\NegocioController;
+use App\Http\Controllers\admin\UsuarioAdminController;
+use App\Http\Controllers\admin\AuditoriaController;
 
 /*
 |--------------------------------------------------------------------------
@@ -22,51 +24,69 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// RUTAS PÚBLICAS (No requieren sesión)
+// =========================================================================
+// RUTAS PÚBLICAS
+// =========================================================================
 Route::get('/planes',[PlanController::class,'verplanes'])->name('plan.verplanes');
 Route::post('/register',[AuthController::class,'register']);
 Route::post('/login',[AuthController::class,'login']);
 
-// RUTAS DE TWILIO
 Route::post('/enviar-codigo', [TwilioController::class, 'enviarCodigo']);
 Route::post('/verificar-codigo', [TwilioController::class, 'verificarCodigo']);
 
-// CITAS CLIENTES
 Route::get('/citasclientes/{slug}',[CitasClientesController::class,'citasclientes']);
 Route::post('/registrar-cita-cliente',[CitasClientesController::class,'registrarcitacliente']);
 Route::post('/horarios-disponibles',[CitasClientesController::class,'horariosdisponibles']);
 
-// PRIVADAS
+// =========================================================================
+// ZONA COMPARTIDA (Entran Administradores y Dueños)
+// =========================================================================
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
     Route::post('/logout',[AuthController::class,'logout']);
-
     Route::get('/dashboard',[DashboardController::class,'index']);
+});
 
-    // Negocios
+// =========================================================================
+// ZONA DUEÑOS (Exclusivo Rol 2)
+// =========================================================================
+Route::middleware(['auth:sanctum', 'role:2'])->group(function () {
+    // Negocios y Servicios
     Route::get('/mis-negocios', [DashboardController::class, 'misNegocios']);
     Route::put('/negocios/{id}', [DashboardController::class, 'actualizarNegocio']);
-
-    // Servicios
     Route::get('/negocios/{id}/servicios', [ServicioController::class, 'obtenerServicios']);
     Route::post('/servicios', [ServicioController::class, 'store']);
     Route::put('/servicios/{id}', [ServicioController::class, 'update']);
     Route::delete('/servicios/{id}', [ServicioController::class, 'destroy']);
 
-    // Tickets
-    Route::get('/tickets', [TicketController::class, 'index']);
-    Route::post('/tickets', [TicketController::class, 'store']);
-    Route::put('/tickets/{id}', [TicketController::class, 'update']);
-
-    // Stripe
-    Route::post('/registrar-plan-negocio', [NegocioController::class, 'registrarPlanNegocio']);
-    Route::post('/upgrade-plan', [NegocioController::class, 'upgradePlanStripe']);
-
-    // Citas Negocio
+    // Citas y Excel
     Route::get('/citas-negocios', [CitasNegociosController::class, 'citasnegocios']);
+    Route::get('/citas-negocios/descargar-excel', [CitasNegociosController::class, 'descargarExcel']);
     Route::get('/citas-negocios/{id_negocio}', [CitasNegociosController::class, 'obtenerCitasNegocio']);
     Route::post('/actualizar-estado-cita', [CitasNegociosController::class, 'actualizarEstadoCita']);
 
-    //CREAR NUEVO NEGOCIO PLANES MEDIO-AVANZADO
+    // Suscripciones y Extra
+    Route::post('/registrar-plan-negocio', [NegocioController::class, 'registrarPlanNegocio']);
+    Route::post('/upgrade-plan', [NegocioController::class, 'upgradePlanStripe']);
     Route::post('/negocios-extra', [NegocioController::class, 'crearNegocioExtra']);
+
+    // Tickets Dueño (Solo crear y ver los suyos)
+    Route::get('/tickets', [TicketController::class, 'index']);
+    Route::post('/tickets', [TicketController::class, 'store']);
+});
+
+// =========================================================================
+// ZONA ADMINISTRADOR (Exclusivo Rol 1)
+// =========================================================================
+Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
+    // Tickets Admin
+    Route::get('/admin/tickets', [TicketController::class, 'indexAdmin']);
+    Route::put('/admin/tickets/{id}', [TicketController::class, 'update']);
+
+    // Gestión de Usuarios Admin
+    Route::get('/admin/usuarios', [UsuarioAdminController::class, 'index']);
+    Route::put('/admin/usuarios/{id}', [UsuarioAdminController::class, 'update']);
+
+    // Auditoría del Sistema
+    Route::get('/admin/auditoria', [AuditoriaController::class, 'index']);
 });

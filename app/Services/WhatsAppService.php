@@ -26,23 +26,29 @@ class WhatsAppService
             'to' => $telefono,
             'type' => 'template',
             'template' => [
-                'name' => 'recordatorio_citas_negocios', //nombre de  plantilla
+                'name' => 'recordatorio_citas_negocios', // nombre de plantilla
                 'language' => ['code' => 'es_MX'],
                 'components' => [
                     [
                         'type' => 'body',
                         'parameters' => [
-                            ['type' => 'text', 'text' => $nombreCliente],
-                            ['type' => 'text', 'text' => $negocio],
-                            ['type' => 'text', 'text' => $servicio],
-                            ['type' => 'text', 'text' => $fecha],
-                            ['type' => 'text', 'text' => $hora],
-                            ['type' => 'text', 'text' => $listaTelefonos]
+                            // Los ?? evitan que mandes un valor null que rompa la petición
+                            ['type' => 'text', 'text' => $nombreCliente ?? 'Cliente'],
+                            ['type' => 'text', 'text' => $negocio ?? 'Negocio'],
+                            ['type' => 'text', 'text' => $servicio ?? 'Servicio'],
+                            ['type' => 'text', 'text' => $fecha ?? 'Fecha'],
+                            ['type' => 'text', 'text' => $hora ?? 'Hora'],
+                            ['type' => 'text', 'text' => $listaTelefonos ?? 'Medios de contacto']
                         ]
                     ]
                 ]
             ]
         ]);
+
+        // --- EL DETECTOR DE ERRORES DE META ---
+        if ($response->failed()) {
+            Log::error('❌ ERROR DE META AL ENVIAR WHATSAPP: ' . $response->body());
+        }
 
         return $response->json();
     }

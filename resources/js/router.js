@@ -7,8 +7,11 @@ import Planes from "./componentes/Planes.vue";
 import PlanCard from "./componentes/PlanCard.vue";
 import Negocios from "./pages/Negocios.vue";
 import TicketsSoporte from "./pages/TicketsSoporte.vue";
+import TicketSoporteAdmin from "./pages/TicketSoporteAdmin.vue";
 import CitasClientes from "./pages/CitasClientes.vue";
 import CitasNegocios from "./pages/CitasNegocios.vue";
+import UsuariosAdmin from "./componentes/UsuariosAdmin.vue";
+import AuditoriaAdmin from "./pages/AuditoriaAdmin.vue";
 
 const routes = [
     {
@@ -39,16 +42,6 @@ const routes = [
         meta: { requiresAuth: true }
     },
     {
-        path: '/soporte',
-        name: 'Soporte',
-        component: TicketsSoporte,
-    },
-    {
-        path: '/:slug',
-        component: CitasClientes,
-        //NO SE LE AGREGA meta: { requiresAuth: true }, PARA QUE LA RUTA PUEDA SER PUBLICA
-    },
-    {
         path: '/citas-negocios',
         component: CitasNegocios,
         meta: { requiresAuth: true }
@@ -57,7 +50,35 @@ const routes = [
         path: '/actualizar-estado-cita',
         component: CitasNegocios,
         meta: { requiresAuth: true }
-    }
+    },
+    {
+        path: '/soporte',
+        name: 'Soporte',
+        component: TicketsSoporte,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/admin-soporte',
+        name: 'AdminSoporte',
+        component: TicketSoporteAdmin,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/admin-usuarios',
+        name: 'AdminUsuarios',
+        component: UsuariosAdmin,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/admin-auditoria',
+        name: 'AdminAuditoria',
+        component: AuditoriaAdmin,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/:slug',
+        component: CitasClientes,
+    },
 ]
 
 const router = createRouter({
@@ -67,16 +88,16 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
-    const publicpages = ['/', '/login', '/register', '/citasclientes']
+    const publicpages = ['/', '/login', '/register', '/citasclientes'] // el comodín no va en este arreglo
     const authrequired = to.meta.requiresAuth
-    const ispublic = publicpages.includes(to.path)
 
-    // NO autenticado → intenta entrar a área protegida
+    // Validamos si la ruta a la que va no requiere auth (es pública)
+    const ispublic = !authrequired;
+
     if (authrequired && !token) {
         return next('/')
     }
-    // Autenticado → intenta ir a login, register o home
-    if (token && ispublic) {
+    if (token && publicpages.includes(to.path)) {
         return next('/dashboard')
     }
     next()

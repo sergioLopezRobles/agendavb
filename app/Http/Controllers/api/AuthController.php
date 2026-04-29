@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Traits\RegistraMovimientos;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -15,27 +16,41 @@ class AuthController extends Controller
 
     public function register(Request $request){
         try {
-            $existeCorreo = DB::select("SELECT email FROM users WHERE email = '$request->email'");
+            $existeCorreo = DB::table('users')->where('email', $request->email)->exists();
 
-            if($existeCorreo != null){
+            if($existeCorreo){
                 return response()->json([
                     'valid' => false,
                     'message' => 'El correo ya existe'
                 ]);
             }
 
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-                'telefono' => $request->telefono
-            ]);
+            $user = null;
+
+            // Transacción: O se crea el usuario Y el rol, o no se crea nada
+            DB::transaction(function () use ($request, &$user) {
+
+                $user = User::create([
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'password' => Hash::make($request->password),
+                    'telefono' => $request->telefono
+                ]);
+
+                // Asignamos el Rol 2 (Dueño) por defecto
+                DB::table('roles_usuarios')->insert([
+                    'id_usuario' => $user->id,
+                    'id_rol' => 2,
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now()
+                ]);
+
+                // Registramos el log
+                $this->guardarLog('usuarios', 'crear', $request->name, $request->all());
+
+            }); // Fin Transacción
 
             $token = $user->createToken('auth_token')->plainTextToken;
-
-            // 3. ¡AQUÍ REGISTRAMOS EL LOG!
-            $this->guardarLog('usuarios', 'crear', $request->name, $request->all());
-
 
             return response()->json([
                 'valid' => true,
@@ -62,10 +77,29 @@ class AuthController extends Controller
                 ]);
             }
 
+            if(!$user || !Hash::check($request->password, $user->password)){
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'Credenciales incorrectas'
+                ]);
+            }
+
+            if($user->estatus == 0){
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'Tu cuenta ha sido suspendida. Por favor contacta al administrador.'
+                ]);
+            }
+
             $token = $user->createToken('auth_token')->plainTextToken;
 
+            // Obtenemos el plan actual
             $planUsuario = DB::table('plan_usuarios')->where('id_usuario', $user->id)->first();
             $user->id_plan = $planUsuario ? $planUsuario->id_plan : null;
+
+            // Obtenemos el rol actual para mandarlo a Vue
+            $rolUsuario = DB::table('roles_usuarios')->where('id_usuario', $user->id)->first();
+            $user->id_rol = $rolUsuario ? $rolUsuario->id_rol : 2; // Por si hay usuarios viejos sin rol, forzamos el 2
 
             return response()->json([
                 'valid' => true,
@@ -85,8 +119,13 @@ class AuthController extends Controller
         try {
             $user = $request->user();
 
+            // Refrescamos plan
             $planUsuario = DB::table('plan_usuarios')->where('id_usuario', $user->id)->first();
             $user->id_plan = $planUsuario ? $planUsuario->id_plan : null;
+
+            // Refrescamos rol
+            $rolUsuario = DB::table('roles_usuarios')->where('id_usuario', $user->id)->first();
+            $user->id_rol = $rolUsuario ? $rolUsuario->id_rol : 2;
 
             return response()->json($user);
         } catch (\Exception $e) {
