@@ -31,4 +31,25 @@ class NegocioAdminController extends Controller
             'negocios' => $negocios
         ]);
     }
+
+    public function obtenerCitasNegocio($id)
+    {
+        $citas = DB::table('citas as c')
+            ->join('servicios as s', 'c.id_servicio', '=', 's.id')
+            ->select(
+                'c.id',
+                'c.cliente_nombre',
+                'c.cliente_telefono',
+                'c.fecha',
+                'c.hora',
+                's.nombre as servicio_nombre'
+            )
+            ->where('c.id_negocio', $id)
+            ->get();
+
+        return response()->json([
+            'valid' => true,
+            'citas' => $citas
+        ]);
+    }
 }

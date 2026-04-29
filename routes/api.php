@@ -95,6 +95,9 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Gestión de Negocios Globales Admin
     Route::get('/admin/negocios', [NegocioAdminController::class, 'index']);
+
+    // Citas de un negocio específico para Admin
+    Route::get('/admin/negocios/{id}/citas', [NegocioAdminController::class, 'obtenerCitasNegocio']);
 });
 
 Route::get('/ver-logo/{nombre}', function($nombre) {

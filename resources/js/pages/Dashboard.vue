@@ -11,7 +11,7 @@ const planAdquirido = ref(null)
 const usuarioLoggeado = ref(null)
 const mostrarTodosPlanes = ref(false)
 const cantidadNegocios = ref(0)
-const citasHoy = ref(0) // <-- NUEVA VARIABLE PARA CITAS DE HOY
+const citasHoy = ref(0)
 
 const userRol = ref(parseInt(localStorage.getItem('userRol')) || 2)
 
@@ -61,7 +61,7 @@ const cargarDashboard = async()  => {
             } else {
                 planAdquirido.value = data.planAdquirido
                 cantidadNegocios.value = data.cantidadNegocios
-                citasHoy.value = data.citasHoy || 0 // <-- ASIGNAMOS EL VALOR
+                citasHoy.value = data.citasHoy || 0
             }
         }
     } catch (error) {

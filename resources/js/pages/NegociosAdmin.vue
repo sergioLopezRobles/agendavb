@@ -1,13 +1,67 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import Layout from '../componentes/Layout.vue';
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import { nextTick } from 'vue';
 
 const token = localStorage.getItem('token');
 const usuarioLoggeado = ref(null);
 const planAdquirido = ref(null);
-
 const negocios = ref([]);
 const buscar = ref('');
+
+// 2. variables de estado citas calendario negocios
+const mostrarModalAgenda = ref(false);
+const negocioSeleccionado = ref(null);
+const citasNegocio = ref([]);
+const mostrarModalDetalle = ref(false);
+const citaDetalle = ref(null);
+
+// 3. Configuración del Calendario (Igual a la del Dueño)
+const eventosCalendario = computed(() => {
+    return citasNegocio.value.map(cita => ({
+        id: cita.id,
+        title: cita.cliente_nombre,
+        start: cita.fecha + 'T' + cita.hora,
+        extendedProps: { ...cita },
+        color: '#0d6efd'
+    }))
+});
+
+const calendarOptions = ref({
+    plugins: [dayGridPlugin, interactionPlugin],
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    events: eventosCalendario,
+    eventClick: (info) => {
+        citaDetalle.value = info.event.extendedProps;
+        mostrarModalDetalle.value = true;
+    },
+    headerToolbar: { left: 'prev,next today', center: 'title', right: '' }
+});
+
+// 4. Función para abrir la agenda
+const abrirAgenda = async (negocio) => {
+    negocioSeleccionado.value = negocio;
+    try {
+        const response = await fetch(`/api/admin/negocios/${negocio.id}/citas`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if(data.valid) {
+            citasNegocio.value = data.citas;
+            mostrarModalAgenda.value = true;
+            await nextTick();
+        }
+    } catch (error) { window.$toast.show('Error al cargar agenda', 'danger', 4000); }
+};
+
+const cerrarModalAgenda = () => {
+    mostrarModalAgenda.value = false;
+    citasNegocio.value = [];
+};
 
 const cargarDatosMenu = async () => {
     try {
@@ -138,7 +192,7 @@ onMounted(() => {
                                     <button class="btn btn-sm btn-outline-primary fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Servicios">
                                         <span>✂️ Servicios</span>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-info fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Citas">
+                                    <button @click="abrirAgenda(n)" class="btn btn-sm btn-outline-info fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Citas">
                                         <span>📅 Citas</span>
                                     </button>
                                     <button class="btn btn-sm btn-outline-dark fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Estadísticas">
@@ -152,6 +206,53 @@ onMounted(() => {
                         </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalAgenda" class="modal fade show d-block" style="background: rgba(0,0,0,0.6); z-index: 1050;">
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content border-0 rounded-4 shadow-lg">
+                    <div class="modal-header border-0 px-4 pt-4">
+                        <h5 class="fw-bold">Agenda de {{ negocioSeleccionado?.negocio_nombre }}</h5>
+                        <button type="button" class="btn-close" @click="cerrarModalAgenda"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="calendar-container shadow-sm border p-3 bg-white rounded-3">
+                            <FullCalendar :options="calendarOptions" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalDetalle" class="modal fade show d-block" style="background: rgba(0,0,0,0.4); z-index: 1060;">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content border-0 rounded-4 shadow">
+                    <div class="modal-header border-0 pb-2">
+                        <h6 class="fw-bold mb-0">Detalles de la Cita</h6>
+                        <button type="button" class="btn-close" @click="mostrarModalDetalle = false"></button>
+                    </div>
+                    <div class="modal-body pt-0">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <p class="mb-1 small text-muted fw-semibold">Servicio:</p>
+                            <p class="fw-bold text-primary mb-3">{{ citaDetalle.servicio_nombre || 'No especificado' }}</p>
+                            <p class="mb-1 small text-muted">Cliente:</p>
+                            <p class="fw-bold mb-2">{{ citaDetalle.cliente_nombre }}</p>
+                            <p class="mb-1 small text-muted">Teléfono:</p>
+                            <p class="fw-bold mb-3">📱 {{ citaDetalle.cliente_telefono }}</p>
+                            <div class="row g-2 border-top pt-2 mt-2">
+                                <div class="col-6">
+                                    <p class="mb-0 small text-muted">Hora:</p>
+                                    <p class="fw-bold text-dark mb-0">{{ citaDetalle.hora }}</p>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-0 small text-muted">Fecha:</p>
+                                    <p class="fw-bold text-dark mb-0">{{ citaDetalle.fecha }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
