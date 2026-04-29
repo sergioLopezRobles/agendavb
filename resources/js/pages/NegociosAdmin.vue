@@ -19,6 +19,10 @@ const citasNegocio = ref([]);
 const mostrarModalDetalle = ref(false);
 const citaDetalle = ref(null);
 
+// Variables para el Modal de Servicios
+const mostrarModalServicios = ref(false);
+const serviciosNegocio = ref([]);
+
 // 3. Configuración del Calendario (Igual a la del Dueño)
 const eventosCalendario = computed(() => {
     return citasNegocio.value.map(cita => ({
@@ -102,6 +106,26 @@ const obtenerRutaLogo = (rutaCompleta) => {
     const partes = rutaCompleta.split('/');
     const nombreArchivo = partes[partes.length - 1]; // Toma lo que está después de la última '/'
     return `/api/ver-logo/${nombreArchivo}`;
+};
+
+// Función para cargar y abrir servicios
+const abrirServicios = async (negocio) => {
+    negocioSeleccionado.value = negocio; // Reutilizamos esta variable
+    try {
+        const response = await fetch(`/api/admin/negocios/${negocio.id}/servicios`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if(data.valid) {
+            serviciosNegocio.value = data.servicios;
+            mostrarModalServicios.value = true;
+        }
+    } catch (error) { window.$toast.show('Error al cargar servicios', 'danger', 4000); }
+};
+
+const cerrarModalServicios = () => {
+    mostrarModalServicios.value = false;
+    serviciosNegocio.value = [];
 };
 
 onMounted(() => {
@@ -189,7 +213,7 @@ onMounted(() => {
                             </td>
                             <td class="px-4 py-3 text-end">
                                 <div class="d-flex justify-content-end gap-2">
-                                    <button class="btn btn-sm btn-outline-primary fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Servicios">
+                                    <button @click="abrirServicios(n)" class="btn btn-sm btn-outline-primary fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Servicios">
                                         <span>✂️ Servicios</span>
                                     </button>
                                     <button @click="abrirAgenda(n)" class="btn btn-sm btn-outline-info fw-bold rounded-3 px-3 d-flex align-items-center" title="Ver Citas">
@@ -250,6 +274,72 @@ onMounted(() => {
                                     <p class="mb-0 small text-muted">Fecha:</p>
                                     <p class="fw-bold text-dark mb-0">{{ citaDetalle.fecha }}</p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="mostrarModalServicios" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); z-index: 1050;">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-0 rounded-4 shadow-lg">
+                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                        <h5 class="fw-bold text-dark mb-0">Gestión de Servicios</h5>
+                        <button type="button" class="btn-close shadow-none" @click="cerrarModalServicios"></button>
+                    </div>
+
+                    <div class="px-4 mt-1 mb-4">
+                        <p class="text-muted small mb-0">Negocio: <span class="fw-bold text-primary">{{ negocioSeleccionado?.negocio_nombre }}</span></p>
+                    </div>
+
+                    <div class="modal-body px-4 pb-4 pt-0">
+                        <div v-if="serviciosNegocio.length === 0" class="text-center py-5 bg-light rounded-3 border">
+                            <span class="fs-1 d-block mb-2">📭</span>
+                            <p class="text-muted mb-0">Este negocio aún no tiene servicios registrados.</p>
+                        </div>
+
+                        <div v-else class="card shadow-sm border-0 rounded-4 overflow-hidden">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="bg-light">
+                                    <tr>
+                                        <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Nombre</th>
+                                        <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Precio Total</th>
+                                        <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Anticipo Fijo</th>
+                                        <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Método</th>
+                                        <th class="py-3 px-3 text-secondary fw-semibold border-bottom-0">Duración</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr v-for="s in serviciosNegocio" :key="s.id">
+                                        <td class="px-4 py-3">
+                                            <div class="fw-bold text-dark">{{ s.nombre }}</div>
+                                            <div v-if="s.notas" class="text-muted mt-1" style="font-size: 0.75rem;">
+                                                📝 {{ s.notas }}
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-3 fw-bold text-success">
+                                            ${{ s.precio }}
+                                        </td>
+                                        <td class="px-3 py-3 fw-bold text-primary">
+                                            <span v-if="s.anticipo && s.anticipo > 0">${{ s.anticipo }}</span>
+                                            <span v-else>(Sin anticipo)</span>
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <span v-if="s.tarjeta == '1'" class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2">
+                                                💳 Tarjeta
+                                            </span>
+                                            <span v-else class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2">
+                                                💵 Efectivo
+                                            </span>
+                                        </td>
+                                        <td class="px-3 py-3 text-muted">
+                                            {{ s.duracion_minutos }} min
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

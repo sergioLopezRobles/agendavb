@@ -52,4 +52,17 @@ class NegocioAdminController extends Controller
             'citas' => $citas
         ]);
     }
+
+    public function obtenerServiciosNegocio($id)
+    {
+        $servicios = DB::table('servicios')
+            ->where('id_negocio', $id)
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json([
+            'valid' => true,
+            'servicios' => $servicios
+        ]);
+    }
 }

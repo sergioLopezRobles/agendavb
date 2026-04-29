@@ -98,7 +98,11 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Citas de un negocio específico para Admin
     Route::get('/admin/negocios/{id}/citas', [NegocioAdminController::class, 'obtenerCitasNegocio']);
+
+    // Servicios de un negocio específico para Admin
+    Route::get('/admin/negocios/{id}/servicios', [NegocioAdminController::class, 'obtenerServiciosNegocio']);
 });
+
 
 Route::get('/ver-logo/{nombre}', function($nombre) {
     $path = base_path('../uploads/documentos/imagenes/' . $nombre);
