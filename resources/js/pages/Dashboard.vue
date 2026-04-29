@@ -1,10 +1,10 @@
 <script setup>
 import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router"; // <-- IMPORTAMOS EL ROUTER
+import { useRouter } from "vue-router";
 import PlanCard from "../componentes/PlanCard.vue";
 import Layout from "../componentes/Layout.vue";
 
-const router = useRouter(); // <-- INICIALIZAMOS EL ROUTER
+const router = useRouter();
 const token = ref(localStorage.getItem('token'))
 const planes = ref([])
 const planAdquirido = ref(null)
@@ -91,7 +91,7 @@ const formatoMoneda = (cantidad) => {
 
             <div class="row g-3 mb-4">
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-success bg-success bg-opacity-10">
+                    <div @click="router.push('/admin-negocios')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-success bg-success bg-opacity-10 interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Ingresos (MRR)</h6>
                             <h4 class="fw-bold mb-0 text-success">{{ formatoMoneda(statsAdmin.ingresos_mrr) }}</h4>
@@ -99,7 +99,7 @@ const formatoMoneda = (cantidad) => {
                     </div>
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-primary">
+                    <div @click="router.push('/admin-negocios')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-primary interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Citas Totales</h6>
                             <h4 class="fw-bold mb-0">{{ statsAdmin.total_citas }}</h4>
@@ -107,7 +107,7 @@ const formatoMoneda = (cantidad) => {
                     </div>
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-info">
+                    <div @click="router.push('/admin-usuarios')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-info interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Usuarios registrados</h6>
                             <h4 class="fw-bold mb-0">{{ statsAdmin.total_usuarios }}</h4>
@@ -115,7 +115,7 @@ const formatoMoneda = (cantidad) => {
                     </div>
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-secondary">
+                    <div @click="router.push('/admin-usuarios')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-secondary interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Suscripciones</h6>
                             <h4 class="fw-bold mb-0">{{ statsAdmin.suscripciones_activas }}</h4>
@@ -123,7 +123,7 @@ const formatoMoneda = (cantidad) => {
                     </div>
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-dark">
+                    <div @click="router.push('/admin-negocios')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-dark interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Negocios</h6>
                             <h4 class="fw-bold mb-0">{{ statsAdmin.total_negocios }}</h4>
@@ -131,7 +131,7 @@ const formatoMoneda = (cantidad) => {
                     </div>
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <div class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-warning">
+                    <div @click="router.push('/admin-soporte')" class="card shadow-sm border-0 rounded-4 h-100 border-start border-4 border-warning interactive-card">
                         <div class="card-body p-3 text-center">
                             <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">Tickets Abiertos</h6>
                             <h4 class="fw-bold mb-0 text-warning">{{ statsAdmin.tickets_pendientes }}</h4>
