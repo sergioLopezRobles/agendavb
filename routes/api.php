@@ -14,6 +14,8 @@ use App\Http\Controllers\stripecard\NegocioController;
 use App\Http\Controllers\admin\UsuarioAdminController;
 use App\Http\Controllers\admin\AuditoriaController;
 use App\Http\Controllers\admin\NegocioAdminController;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\File;
 
 /*
 |--------------------------------------------------------------------------
@@ -93,4 +95,20 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Gestión de Negocios Globales Admin
     Route::get('/admin/negocios', [NegocioAdminController::class, 'index']);
+});
+
+Route::get('/ver-logo/{nombre}', function($nombre) {
+    $path = base_path('../uploads/documentos/imagenes/' . $nombre);
+
+    if (!File::exists($path)) {
+        abort(404);
+    }
+
+    $file = File::get($path);
+    $type = File::mimeType($path);
+
+    $response = Response::make($file, 200);
+    $response->header("Content-Type", $type);
+
+    return $response;
 });

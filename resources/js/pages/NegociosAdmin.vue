@@ -43,6 +43,13 @@ const negociosFiltrados = computed(() => {
     });
 });
 
+const obtenerRutaLogo = (rutaCompleta) => {
+    if (!rutaCompleta) return '';
+    const partes = rutaCompleta.split('/');
+    const nombreArchivo = partes[partes.length - 1]; // Toma lo que está después de la última '/'
+    return `/api/ver-logo/${nombreArchivo}`;
+};
+
 onMounted(() => {
     cargarDatosMenu();
     cargarNegocios();
@@ -90,11 +97,26 @@ onMounted(() => {
                         <tbody>
                         <tr v-for="n in negociosFiltrados" :key="n.id">
                             <td class="px-4 py-3">
-                                <div class="fw-bold text-dark fs-6 d-flex align-items-center">
-                                    <span class="fs-5 me-2 text-primary">🏪</span>
-                                    {{ n.negocio_nombre }}
+                                <div class="d-flex align-items-center">
+                                    <div class="me-3">
+                                        <img v-if="n.logo"
+                                             :src="obtenerRutaLogo(n.logo)"
+                                             alt="Logo"
+                                             class="rounded-circle shadow-sm border bg-white"
+                                             style="width: 45px; height: 45px; object-fit: cover;">
+
+                                        <div v-else
+                                             class="rounded-circle shadow-sm d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary fw-bold border border-primary border-opacity-25"
+                                             style="width: 45px; height: 45px; font-size: 1.2rem;">
+                                            {{ n.negocio_nombre.charAt(0).toUpperCase() }}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="fw-bold text-dark fs-6">{{ n.negocio_nombre }}</div>
+                                        <div class="text-muted small">✉️ {{ n.negocio_email || 'Sin correo de local' }}</div>
+                                    </div>
                                 </div>
-                                <div class="text-muted small ms-4">✉️ {{ n.negocio_email || 'Sin correo de local' }}</div>
                             </td>
                             <td class="px-4 py-3">
                                 <div class="fw-bold text-dark">{{ n.dueno_nombre }}</div>

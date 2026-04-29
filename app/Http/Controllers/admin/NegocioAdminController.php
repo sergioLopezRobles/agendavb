@@ -16,6 +16,7 @@ class NegocioAdminController extends Controller
                 'n.id',
                 'n.nombre as negocio_nombre',
                 'n.email as negocio_email',
+                'n.logo',
                 'n.direccion',
                 'u.name as dueno_nombre',
                 'u.telefono as dueno_telefono',
