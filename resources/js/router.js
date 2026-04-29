@@ -12,6 +12,7 @@ import CitasClientes from "./pages/CitasClientes.vue";
 import CitasNegocios from "./pages/CitasNegocios.vue";
 import UsuariosAdmin from "./componentes/UsuariosAdmin.vue";
 import AuditoriaAdmin from "./pages/AuditoriaAdmin.vue";
+import NegociosAdmin from "./pages/NegociosAdmin.vue";
 
 const routes = [
     {
@@ -73,6 +74,12 @@ const routes = [
         path: '/admin-auditoria',
         name: 'AdminAuditoria',
         component: AuditoriaAdmin,
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/admin-negocios',
+        name: 'AdminNegocios',
+        component: NegociosAdmin,
         meta: { requiresAuth: true }
     },
     {

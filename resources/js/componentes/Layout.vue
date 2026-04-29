@@ -118,6 +118,13 @@ const logout = async () => {
                     </li>
 
                     <li class="nav-item">
+                        <router-link to="/admin-negocios" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/admin-negocios' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
+                            <span class="fs-4 icon-menu me-3">🏢</span>
+                            <span class="menu-text fw-medium">Negocios</span>
+                        </router-link>
+                    </li>
+
+                    <li class="nav-item">
                         <router-link to="/admin-soporte" class="nav-link rounded-3 d-flex align-items-center py-2 px-3" :class="[$route.path === '/admin-soporte' ? 'bg-primary text-white' : 'text-dark hover-bg-light']">
                             <span class="fs-4 icon-menu me-3">🛠️</span>
                             <span class="menu-text fw-medium">Bandeja de Tickets</span>

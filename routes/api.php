@@ -13,6 +13,7 @@ use App\Http\Controllers\ticket\TicketController;
 use App\Http\Controllers\stripecard\NegocioController;
 use App\Http\Controllers\admin\UsuarioAdminController;
 use App\Http\Controllers\admin\AuditoriaController;
+use App\Http\Controllers\admin\NegocioAdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -89,4 +90,7 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Auditoría del Sistema
     Route::get('/admin/auditoria', [AuditoriaController::class, 'index']);
+
+    // Gestión de Negocios Globales Admin
+    Route::get('/admin/negocios', [NegocioAdminController::class, 'index']);
 });
