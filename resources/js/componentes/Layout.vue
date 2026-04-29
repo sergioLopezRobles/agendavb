@@ -11,11 +11,9 @@ const props = defineProps({
     planAdquirido: Object
 });
 
-// --> leemos la memoria local de forma instantanea para evitar el parpadeo
 const tienePlan = ref(localStorage.getItem('userHasPlan') === 'true');
 const userRol = ref(parseInt(localStorage.getItem('userRol')) || null);
 
-// --> vigilamos cuando la base de datos responda para guardar el plan en memoria
 watch(() => props.planAdquirido, (nuevoValor) => {
     if (nuevoValor && nuevoValor.id) {
         tienePlan.value = true;
@@ -23,7 +21,6 @@ watch(() => props.planAdquirido, (nuevoValor) => {
     }
 }, { immediate: true });
 
-// --> vigilamos cuando la base de datos responda para guardar el rol en memoria
 watch(() => props.usuarioLoggeado, (nuevoValor) => {
     if (nuevoValor && nuevoValor.id_rol) {
         userRol.value = nuevoValor.id_rol;
@@ -106,8 +103,13 @@ const logout = async () => {
                 </template>
 
                 <template v-if="userRol === 1">
-                    <li class="nav-item mt-2 pt-2 border-top">
-                        <small class="text-danger fw-bold ms-3 menu-text d-block mb-1" style="font-size: 0.75rem;">PANEL ADMIN</small>
+                    <li class="nav-item mt-3 pt-3 border-top position-relative">
+                        <div class="ms-3 menu-text mb-2">
+                            <div class="badge bg-dark bg-gradient text-white shadow-sm rounded-pill py-2 px-3 d-inline-flex align-items-center border border-secondary border-opacity-50">
+                                <span class="fs-6 me-2">🛡️</span>
+                                <span class="fw-bold" style="letter-spacing: 1px; font-size: 0.70rem;">MODULOS ADMIN</span>
+                            </div>
+                        </div>
                     </li>
 
                     <li class="nav-item">
