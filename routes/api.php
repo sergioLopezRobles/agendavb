@@ -16,20 +16,14 @@ use App\Http\Controllers\admin\AuditoriaController;
 use App\Http\Controllers\admin\NegocioAdminController;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\File;
+use App\Http\Controllers\admin\ChatAdminController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
-// =========================================================================
 // RUTAS PÚBLICAS
-// =========================================================================
 Route::get('/planes',[PlanController::class,'verplanes'])->name('plan.verplanes');
 Route::post('/register',[AuthController::class,'register']);
 Route::post('/login',[AuthController::class,'login']);
@@ -41,18 +35,14 @@ Route::get('/citasclientes/{slug}',[CitasClientesController::class,'citascliente
 Route::post('/registrar-cita-cliente',[CitasClientesController::class,'registrarcitacliente']);
 Route::post('/horarios-disponibles',[CitasClientesController::class,'horariosdisponibles']);
 
-// =========================================================================
 // ZONA COMPARTIDA (Entran Administradores y Dueños)
-// =========================================================================
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
     Route::post('/logout',[AuthController::class,'logout']);
     Route::get('/dashboard',[DashboardController::class,'index']);
 });
 
-// =========================================================================
 // ZONA DUEÑOS (Exclusivo Rol 2)
-// =========================================================================
 Route::middleware(['auth:sanctum', 'role:2'])->group(function () {
     // Negocios y Servicios
     Route::get('/mis-negocios', [DashboardController::class, 'misNegocios']);
@@ -78,9 +68,7 @@ Route::middleware(['auth:sanctum', 'role:2'])->group(function () {
     Route::post('/tickets', [TicketController::class, 'store']);
 });
 
-// =========================================================================
 // ZONA ADMINISTRADOR (Exclusivo Rol 1)
-// =========================================================================
 Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
     // Tickets Admin
     Route::get('/admin/tickets', [TicketController::class, 'indexAdmin']);
@@ -104,8 +92,12 @@ Route::middleware(['auth:sanctum', 'role:1'])->group(function () {
 
     // Ruta de estadisticas por negocio
     Route::get('/admin/negocios/{id}/stats', [NegocioAdminController::class, 'obtenerEstadisticasNegocio']);
-});
 
+    // Chat Interno Admin (Direct Messages)
+    Route::get('/admin/chat/contactos', [ChatAdminController::class, 'getContactos']);
+    Route::get('/admin/chat/conversacion/{id}', [ChatAdminController::class, 'getConversacion']);
+    Route::post('/admin/chat/enviar', [ChatAdminController::class, 'storePrivado']);
+});
 
 Route::get('/ver-logo/{nombre}', function($nombre) {
     $path = base_path('../uploads/documentos/imagenes/' . $nombre);
