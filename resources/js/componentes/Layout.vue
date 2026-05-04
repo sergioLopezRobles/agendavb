@@ -5,6 +5,12 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const isSidebarExpanded = ref(true);
 
+// --- LÓGICA DE PERFIL ---
+const nombreEdit = ref('');
+const archivoAvatar = ref(null);
+const fotoPreview = ref(null);
+const cargandoPerfil = ref(false);
+
 // recibir los datos de la vista que este usando layout
 const props = defineProps({
     usuarioLoggeado: Object,
@@ -125,6 +131,65 @@ const abrirChat = () => {
 };
 
 // --- FIN LÓGICA CHAT ---
+
+const avatarUsuario = computed(() => {
+    if (props.usuarioLoggeado?.avatar) {
+        return `http://localhost/${props.usuarioLoggeado.avatar}`;
+    }
+    return `https://ui-avatars.com/api/?name=${props.usuarioLoggeado?.name || 'User'}&background=0D6EFD&color=fff`;
+});
+
+// Cargar datos al abrir el modal
+const abrirModalPerfil = () => {
+    nombreEdit.value = props.usuarioLoggeado?.name || '';
+    fotoPreview.value = null;
+    archivoAvatar.value = null;
+};
+
+// Previsualizar la foto antes de subirla
+const onAvatarChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        archivoAvatar.value = file;
+        fotoPreview.value = URL.createObjectURL(file);
+    }
+};
+
+// Enviar datos al backend
+const actualizarPerfil = async () => {
+    cargandoPerfil.value = true;
+    const formData = new FormData();
+    formData.append('name', nombreEdit.value);
+    if (archivoAvatar.value) {
+        formData.append('avatar', archivoAvatar.value);
+    }
+
+    try {
+        const response = await fetch('/api/perfil/actualizar', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                // OJO: No se pone 'Content-Type' cuando usamos FormData, fetch lo pone solo.
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        if (data.valid) {
+            // Actualizamos los datos del layout en tiempo real
+            props.usuarioLoggeado.name = data.user.name;
+            props.usuarioLoggeado.avatar = data.user.avatar;
+
+            // Cerrar el modal
+            document.getElementById('btnCerrarModalPerfil').click();
+        }
+    } catch (error) {
+        console.error("Error al actualizar perfil:", error);
+    } finally {
+        cargandoPerfil.value = false;
+    }
+};
+// --- FIN LÓGICA PERFIL ---
 
 onMounted(() => {
     if (userRol.value === 1) {
@@ -298,14 +363,16 @@ const logout = async () => {
 
                         <div class="dropdown ms-2">
                             <button class="btn border-0 p-0 rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <img :src="`https://ui-avatars.com/api/?name=${usuarioLoggeado?.name || 'Admin'}&background=0D6EFD&color=fff`" alt="Perfil" class="rounded-circle shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
+                                <!-- 🔥 CAMBIO: Aquí usamos la variable reactiva avatarUsuario -->
+                                <img :src="avatarUsuario" alt="Perfil" class="rounded-circle shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2 rounded-4" style="min-width: 200px;">
                                 <li class="px-3 py-2 mb-1 border-bottom">
                                     <span class="fw-bold text-dark d-block">{{ usuarioLoggeado?.name || 'Usuario' }}</span>
                                     <small class="text-muted">{{ usuarioLoggeado?.email || '' }}</small>
                                 </li>
-                                <li><a class="dropdown-item rounded-3 py-2" href="#">👤 Mi Perfil</a></li>
+                                <!-- 🔥 CAMBIO: Agregamos atributos para abrir el modal -->
+                                <li><a class="dropdown-item rounded-3 py-2" href="#" data-bs-toggle="modal" data-bs-target="#perfilModal" @click="abrirModalPerfil">👤 Mi Perfil</a></li>
 
                                 <!-- Opción de Mensajes en Dropdown (Solo Admin) -->
                                 <li v-if="userRol === 1">
@@ -445,6 +512,59 @@ const logout = async () => {
                 </div>
             </template>
 
+        </div>
+    </div>
+
+    <!-- 🔥 CAMBIO: MODAL DE PERFIL AGREGADO AQUÍ -->
+    <div class="modal fade" id="perfilModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="modal-header bg-light border-0 px-4 py-3">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center">
+                        <span class="fs-4 me-2">👤</span> Configuración de Perfil
+                    </h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" id="btnCerrarModalPerfil"></button>
+                </div>
+                <div class="modal-body px-4 py-4">
+                    <form @submit.prevent="actualizarPerfil">
+
+                        <!-- ZONA DE FOTO DE PERFIL -->
+                        <div class="text-center mb-4">
+                            <div class="position-relative d-inline-block mb-3">
+                                <img :src="fotoPreview || avatarUsuario" alt="Tu Perfil" class="rounded-circle shadow border border-3 border-white" style="width: 120px; height: 120px; object-fit: cover;">
+
+                                <!-- Botón flotante para subir foto -->
+                                <label for="avatarInput" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow hover-shadow cursor-pointer" style="width: 35px; height: 35px; cursor: pointer; transform: translate(10%, 10%);">
+                                    <span>📷</span>
+                                </label>
+                                <input type="file" id="avatarInput" class="d-none" accept="image/jpeg, image/png, image/jpg, image/webp" @change="onAvatarChange">
+                            </div>
+                            <p class="text-muted small mb-0">Formatos: JPG, PNG. Max: 2MB.</p>
+                        </div>
+
+                        <!-- ZONA DE NOMBRE -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-muted small">Nombre a mostrar</label>
+                            <input type="text" v-model="nombreEdit" class="form-control bg-light border-0 shadow-none rounded-3 px-3 py-2" required>
+                        </div>
+
+                        <!-- EMAIL (Solo lectura) -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-muted small">Correo Electrónico</label>
+                            <input type="email" :value="usuarioLoggeado?.email" class="form-control border-0 shadow-none rounded-3 px-3 py-2 bg-secondary bg-opacity-10 text-muted" readonly disabled>
+                            <small class="text-muted" style="font-size: 0.7rem;">El correo no se puede cambiar por motivos de seguridad.</small>
+                        </div>
+
+                        <!-- BOTONES -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary fw-bold py-2 rounded-3 d-flex justify-content-center align-items-center" :disabled="cargandoPerfil">
+                                <span v-if="cargandoPerfil" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                {{ cargandoPerfil ? 'Guardando...' : 'Guardar Cambios' }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

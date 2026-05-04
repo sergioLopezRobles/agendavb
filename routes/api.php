@@ -17,6 +17,7 @@ use App\Http\Controllers\admin\NegocioAdminController;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\File;
 use App\Http\Controllers\admin\ChatAdminController;
+use App\Http\Controllers\ProfileController;
 
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
@@ -40,6 +41,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user',[AuthController::class,'user']);
     Route::post('/logout',[AuthController::class,'logout']);
     Route::get('/dashboard',[DashboardController::class,'index']);
+
+    // Ruta para actualizar perfil (Cualquier usuario loggeado puede hacerlo)
+    Route::post('/perfil/actualizar', [ProfileController::class, 'update']);
 });
 
 // ZONA DUEÑOS (Exclusivo Rol 2)

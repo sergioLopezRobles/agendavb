@@ -99,7 +99,7 @@ class AuthController extends Controller
 
             // Obtenemos el rol actual para mandarlo a Vue
             $rolUsuario = DB::table('roles_usuarios')->where('id_usuario', $user->id)->first();
-            $user->id_rol = $rolUsuario ? $rolUsuario->id_rol : 2; // Por si hay usuarios viejos sin rol, forzamos el 2
+            $user->id_rol = $rolUsuario ? $rolUsuario->id_rol : 2;
 
             return response()->json([
                 'valid' => true,

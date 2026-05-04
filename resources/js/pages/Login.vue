@@ -55,16 +55,11 @@ const login = async () => {
         if(data.valid && data.token){
             localStorage.setItem('token', data.token)
             localStorage.setItem('userEmail', email.value)
-
-            // 👇 SOLUCIÓN BUG 1: GUARDAMOS EL ROL Y EL PLAN INMEDIATAMENTE 👇
             localStorage.setItem('userRol', data.user.id_rol.toString())
             localStorage.setItem('userHasPlan', data.has_plan ? 'true' : 'false')
-            // -------------------------------------------------------------
-
             window.$toast.show('Bienvenido '  + data.user.name, 'success', 5000)
             router.push('/dashboard')
         } else {
-            // Mostramos el mensaje si está suspendido o se equivoca de contraseña
             window.$toast.show(data.message || 'Error al iniciar sesión', 'danger', 5000)
         }
     } catch (error) {

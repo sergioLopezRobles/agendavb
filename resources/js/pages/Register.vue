@@ -40,7 +40,7 @@ const enviarCodigoSMS = async () => {
         })
         const data = await response.json()
 
-        if (data.success || data.valid) { // Adaptado por si tu API devuelve success o valid
+        if (data.success || data.valid) {
             window.$toast.show('Código enviado por SMS', 'info', 4000)
             codigoEnviado.value = true
         } else {
@@ -107,7 +107,7 @@ const validar = () => {
         telefonoError.value = 'Ingresa tu número de 10 dígitos.'
         valido = false
     }
-    // COMENTA ESTE BLOQUE PARA SALTAR LA VALIDACIÓN DE TWILIO
+    // COMENTAR ESTE BLOQUE PARA SALTAR LA VALIDACIÓN DE TWILIO
 /*else if (!numeroVerificado.value) {
     telefonoError.value = 'Debes verificar tu número para continuar.'
     window.$toast.show('Verifica tu número de teléfono primero', 'warning', 3000)
@@ -134,31 +134,31 @@ return valido
 }
 
 const register = async () => {
-if (!validar()) return
+    if (!validar()) return
 
-const response = await fetch('/api/register',{
-    method: 'POST',
-    headers: {
-        'Content-Type' : 'application/json'
-    },
-    body: JSON.stringify({
-        name: name.value,
-        email: email.value,
-        password: password.value,
-        telefono: telefono.value // <-- Mandamos el teléfono verificado
+    const response = await fetch('/api/register',{
+        method: 'POST',
+        headers: {
+            'Content-Type' : 'application/json'
+        },
+        body: JSON.stringify({
+            name: name.value,
+            email: email.value,
+            password: password.value,
+            telefono: telefono.value
+        })
     })
-})
 
-const data = await response.json()
+    const data = await response.json()
 
-if(data.valid){
-    window.$toast.show(data.message, 'success', 5000)
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('userEmail', email.value)
-    router.push('/dashboard')
-}else{
-    window.$toast.show(data.message, 'warning', 5000)
-}
+    if(data.valid){
+        window.$toast.show(data.message, 'success', 5000)
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('userEmail', email.value)
+        router.push('/dashboard')
+    }else{
+        window.$toast.show(data.message, 'warning', 5000)
+    }
 }
 </script>
 
