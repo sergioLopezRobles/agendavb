@@ -5,12 +5,6 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const isSidebarExpanded = ref(true);
 
-// --- LÓGICA DE PERFIL ---
-const nombreEdit = ref('');
-const archivoAvatar = ref(null);
-const fotoPreview = ref(null);
-const cargandoPerfil = ref(false);
-
 // recibir los datos de la vista que este usando layout
 const props = defineProps({
     usuarioLoggeado: Object,
@@ -20,121 +14,26 @@ const props = defineProps({
 const tienePlan = ref(localStorage.getItem('userHasPlan') === 'true');
 const userRol = ref(parseInt(localStorage.getItem('userRol')) || null);
 
-// Variable para controlar el puntito de notificación
-const hayMensajesNuevos = ref(false);
+// --- LÓGICA DE PERFIL ---
+const nombreEdit = ref('');
+const archivoAvatar = ref(null);
+const fotoPreview = ref(null);
+const cargandoPerfil = ref(false);
 
-// --- LÓGICA DE CHAT PRIVADO ---
-// Variable para asegurar nuestro ID numérico
-const miId = computed(() => props.usuarioLoggeado ? Number(props.usuarioLoggeado.id) : 0);
+const avatarLocal = ref(null);
 
-// --- LÓGICA DE CHAT PRIVADO ---
-const contactosAdmin = ref([]);
-const adminSeleccionado = ref(null);
-const mensajesAdmin = ref([]);
-const nuevoMensaje = ref('');
-const chatContainer = ref(null);
-let chatInterval = null;
+// Escuchamos agresivamente cualquier cambio en el usuario (como cuando das F5 y carga de la BD)
+watch(() => props.usuarioLoggeado, (nuevoValor) => {
+    if (nuevoValor && nuevoValor.avatar) {
+        avatarLocal.value = nuevoValor.avatar;
+    }
+}, { immediate: true, deep: true });
 
-const formatHora = (fechaString) => {
-    if(!fechaString) return '';
-    return new Date(fechaString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-const hacerScrollBottom = () => {
-    nextTick(() => {
-        if (chatContainer.value) {
-            chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
-        }
-    });
-};
-
-// 1. Cargar lista de compañeros
-const cargarContactos = async () => {
-    if (userRol.value !== 1) return;
-    try {
-        const response = await fetch('/api/admin/chat/contactos', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await response.json();
-        if (data.valid) contactosAdmin.value = data.contactos;
-    } catch (error) { console.error(error); }
-};
-
-// 2. Cargar mensajes de una conversación
-const cargarConversacion = async () => {
-    if (!adminSeleccionado.value) return;
-    try {
-        const response = await fetch(`/api/admin/chat/conversacion/${adminSeleccionado.value.id}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        const data = await response.json();
-
-        if (data.valid) {
-            const cantidadAnterior = mensajesAdmin.value.length;
-
-            mensajesAdmin.value = data.mensajes.map(m => ({
-                ...m,
-                id_usuario: Number(m.id_usuario),
-                receptor_id: Number(m.receptor_id)
-            }));
-
-            // Auto-scroll solo si hay mensajes nuevos
-            if (mensajesAdmin.value.length > cantidadAnterior) {
-                hacerScrollBottom();
-            }
-        }
-    } catch (error) { console.error(error); }
-};
-
-// 3. Entrar a un chat
-const seleccionarContacto = (contacto) => {
-    adminSeleccionado.value = contacto;
-    mensajesAdmin.value = [];
-    cargarConversacion();
-    // Iniciamos el sondeo rápido solo para esta conversación
-    if (chatInterval) clearInterval(chatInterval);
-    chatInterval = setInterval(cargarConversacion, 3000);
-};
-
-// 4. Salir a la lista
-const volverAContactos = () => {
-    adminSeleccionado.value = null;
-    mensajesAdmin.value = [];
-    if (chatInterval) clearInterval(chatInterval);
-};
-
-// 5. Enviar Mensaje
-const enviarMensaje = async () => {
-    if (!nuevoMensaje.value.trim() || !adminSeleccionado.value) return;
-    const msj = nuevoMensaje.value;
-    nuevoMensaje.value = '';
-
-    try {
-        await fetch('/api/admin/chat/enviar', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({
-                mensaje: msj,
-                receptor_id: adminSeleccionado.value.id
-            })
-        });
-        cargarConversacion();
-    } catch (error) { console.error(error); }
-};
-
-// 6. Quitar notificación al abrir el chat
-const abrirChat = () => {
-    hayMensajesNuevos.value = false;
-};
-
-// --- FIN LÓGICA CHAT ---
-
+// El computed definitivo: Usa lo que acabas de subir O lo que trae la base de datos
 const avatarUsuario = computed(() => {
-    if (props.usuarioLoggeado?.avatar) {
-        return `http://localhost/${props.usuarioLoggeado.avatar}`;
+    const rutaFinal = avatarLocal.value || props.usuarioLoggeado?.avatar;
+    if (rutaFinal) {
+        return `http://localhost/${rutaFinal}`;
     }
     return `https://ui-avatars.com/api/?name=${props.usuarioLoggeado?.name || 'User'}&background=0D6EFD&color=fff`;
 });
@@ -169,18 +68,21 @@ const actualizarPerfil = async () => {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
-                // OJO: No se pone 'Content-Type' cuando usamos FormData, fetch lo pone solo.
             },
             body: formData
         });
 
         const data = await response.json();
         if (data.valid) {
-            // Actualizamos los datos del layout en tiempo real
-            props.usuarioLoggeado.name = data.user.name;
-            props.usuarioLoggeado.avatar = data.user.avatar;
+            // Actualizamos la foto en tiempo real
+            avatarLocal.value = data.user.avatar;
 
-            // Cerrar el modal
+            // Forzamos la actualización de las props para que no se borre
+            if(props.usuarioLoggeado) {
+                props.usuarioLoggeado.avatar = data.user.avatar;
+                props.usuarioLoggeado.name = data.user.name;
+            }
+
             document.getElementById('btnCerrarModalPerfil').click();
         }
     } catch (error) {
@@ -191,11 +93,129 @@ const actualizarPerfil = async () => {
 };
 // --- FIN LÓGICA PERFIL ---
 
+// Variable para controlar el puntito de notificación
+const hayMensajesNuevos = ref(false);
+
+// --- LÓGICA DE CHAT PRIVADO ---
+const miId = computed(() => props.usuarioLoggeado ? Number(props.usuarioLoggeado.id) : 0);
+const contactosAdmin = ref([]);
+const adminSeleccionado = ref(null);
+const mensajesAdmin = ref([]);
+const nuevoMensaje = ref('');
+const chatContainer = ref(null);
+let chatInterval = null;
+
+const formatHora = (fechaString) => {
+    if(!fechaString) return '';
+    return new Date(fechaString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const hacerScrollBottom = () => {
+    nextTick(() => {
+        if (chatContainer.value) {
+            chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
+        }
+    });
+};
+
+const cargarContactos = async () => {
+    if (userRol.value !== 1) return;
+    try {
+        const response = await fetch('/api/admin/chat/contactos', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await response.json();
+        if (data.valid) contactosAdmin.value = data.contactos;
+    } catch (error) { console.error(error); }
+};
+
+const cargarConversacion = async () => {
+    if (!adminSeleccionado.value) return;
+    try {
+        const response = await fetch(`/api/admin/chat/conversacion/${adminSeleccionado.value.id}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await response.json();
+
+        if (data.valid) {
+            const cantidadAnterior = mensajesAdmin.value.length;
+
+            mensajesAdmin.value = data.mensajes.map(m => ({
+                ...m,
+                id_usuario: Number(m.id_usuario),
+                receptor_id: Number(m.receptor_id)
+            }));
+
+            if (mensajesAdmin.value.length > cantidadAnterior) {
+                hacerScrollBottom();
+            }
+        }
+    } catch (error) { console.error(error); }
+};
+
+const seleccionarContacto = (contacto) => {
+    adminSeleccionado.value = contacto;
+    mensajesAdmin.value = [];
+    cargarConversacion();
+    if (chatInterval) clearInterval(chatInterval);
+    chatInterval = setInterval(cargarConversacion, 3000);
+};
+
+const volverAContactos = () => {
+    adminSeleccionado.value = null;
+    mensajesAdmin.value = [];
+    if (chatInterval) clearInterval(chatInterval);
+};
+
+const enviarMensaje = async () => {
+    if (!nuevoMensaje.value.trim() || !adminSeleccionado.value) return;
+    const msj = nuevoMensaje.value;
+    nuevoMensaje.value = '';
+
+    try {
+        await fetch('/api/admin/chat/enviar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+                mensaje: msj,
+                receptor_id: adminSeleccionado.value.id
+            })
+        });
+        cargarConversacion();
+    } catch (error) { console.error(error); }
+};
+
+const abrirChat = () => {
+    hayMensajesNuevos.value = false;
+};
+
+const obtenerUsuarioFresco = async () => {
+    try {
+        const response = await fetch('/api/user', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'Accept': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (data && data.avatar) {
+            avatarLocal.value = data.avatar; // Fuerza la foto real
+        }
+    } catch (error) {
+        console.error(error);
+    }
+};
+// --- FIN LÓGICA CHAT ---
+
 onMounted(() => {
+    // ESTO OBLIGA A TRAER LA FOTO DE LA BD AL DAR F5
+    obtenerUsuarioFresco();
+
     if (userRol.value === 1) {
         cargarContactos();
-
-        // Escuchar cuando el panel lateral se cierra para limpiar el intervalo y volver a la lista
         const offcanvasElement = document.getElementById('chatAdminPanel');
         if(offcanvasElement) {
             offcanvasElement.addEventListener('hidden.bs.offcanvas', volverAContactos);
@@ -349,13 +369,11 @@ const logout = async () => {
                     </div>
 
                     <div class="d-flex align-items-center gap-3">
-                        <!-- Botón Circular de Mensajes (Solo Admin) -->
                         <button v-if="userRol === 1" class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow" data-bs-toggle="offcanvas" data-bs-target="#chatAdminPanel">
                             <span class="fs-5">✉️</span>
                             <span v-if="hayMensajesNuevos" class="position-absolute top-25 start-75 translate-middle p-1 bg-primary border border-light rounded-circle"></span>
                         </button>
 
-                        <!-- Campana de Notificaciones (General) -->
                         <button class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow">
                             <span class="fs-5">🔔</span>
                             <span class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
@@ -363,7 +381,6 @@ const logout = async () => {
 
                         <div class="dropdown ms-2">
                             <button class="btn border-0 p-0 rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <!-- 🔥 CAMBIO: Aquí usamos la variable reactiva avatarUsuario -->
                                 <img :src="avatarUsuario" alt="Perfil" class="rounded-circle shadow-sm" style="width: 45px; height: 45px; object-fit: cover;">
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-2 rounded-4" style="min-width: 200px;">
@@ -371,10 +388,8 @@ const logout = async () => {
                                     <span class="fw-bold text-dark d-block">{{ usuarioLoggeado?.name || 'Usuario' }}</span>
                                     <small class="text-muted">{{ usuarioLoggeado?.email || '' }}</small>
                                 </li>
-                                <!-- 🔥 CAMBIO: Agregamos atributos para abrir el modal -->
                                 <li><a class="dropdown-item rounded-3 py-2" href="#" data-bs-toggle="modal" data-bs-target="#perfilModal" @click="abrirModalPerfil">👤 Mi Perfil</a></li>
 
-                                <!-- Opción de Mensajes en Dropdown (Solo Admin) -->
                                 <li v-if="userRol === 1">
                                     <button class="dropdown-item rounded-3 py-2 d-flex align-items-center justify-content-between" data-bs-toggle="offcanvas" data-bs-target="#chatAdminPanel">
                                         <div>
@@ -404,8 +419,6 @@ const logout = async () => {
 
     <!-- PANEL LATERAL: DIRECT MESSAGES -->
     <div class="offcanvas offcanvas-end shadow-lg border-0" tabindex="-1" id="chatAdminPanel" style="width: 380px;">
-
-        <!-- CABECERA DINÁMICA -->
         <div class="offcanvas-header border-bottom bg-white px-3 py-3">
             <div v-if="!adminSeleccionado" class="d-flex align-items-center w-100">
                 <span class="fs-4 me-2">🛡️</span>
@@ -430,10 +443,7 @@ const logout = async () => {
             </div>
         </div>
 
-        <!-- CUERPO DEL PANEL -->
         <div class="offcanvas-body d-flex flex-column p-0 bg-light">
-
-            <!-- VISTA 1: LISTA DE CONTACTOS -->
             <div v-if="!adminSeleccionado" class="p-2">
                 <div v-if="contactosAdmin.length === 0" class="text-center py-5 text-muted small">
                     No hay otros administradores registrados.
@@ -453,7 +463,6 @@ const logout = async () => {
                 </div>
             </div>
 
-            <!-- VISTA 2: ZONA DE MENSAJES -->
             <template v-else>
                 <div class="flex-grow-1 p-3 overflow-auto" ref="chatContainer">
                     <div class="text-center my-3 text-muted small">
@@ -464,26 +473,21 @@ const logout = async () => {
                         Envía el primer mensaje a {{ adminSeleccionado.name }}
                     </div>
 
-                    <!-- Usamos el ID del contacto seleccionado para saber de quién es el mensaje -->
                     <div v-for="(m, index) in mensajesAdmin" :key="m.id"
                          :class="['d-flex',
                                  m.id_usuario != adminSeleccionado.id ? 'justify-content-end' : '',
                                  (index === mensajesAdmin.length - 1 || mensajesAdmin[index + 1].id_usuario != m.id_usuario) ? 'mb-3' : 'mb-1'
                          ]">
 
-                        <!-- Contenedor del Avatar (Solo si el mensaje ES del contacto) -->
                         <div v-if="m.id_usuario == adminSeleccionado.id" class="flex-shrink-0 me-2" style="width: 32px;">
-                            <!-- La foto SOLO se muestra en el primer mensaje de la racha -->
                             <div v-if="index === 0 || mensajesAdmin[index - 1].id_usuario != m.id_usuario"
                                  class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 32px; height: 32px; font-size: 0.8rem;">
                                 {{ adminSeleccionado.name.charAt(0).toUpperCase() }}
                             </div>
                         </div>
 
-                        <!-- Globo de Mensaje -->
                         <div :class="[m.id_usuario != adminSeleccionado.id ? 'bg-primary bg-gradient text-white' : 'bg-white border', 'py-2 px-3 shadow-sm rounded-4']" style="max-width: 85%;">
 
-                            <!-- Nombre del contacto (SOLO si es del contacto y es el primero de la racha) -->
                             <div v-if="m.id_usuario == adminSeleccionado.id && (index === 0 || mensajesAdmin[index - 1].id_usuario != m.id_usuario)"
                                  class="fw-bold mb-1 text-dark opacity-75" style="font-size: 0.65rem;">
                                 {{ adminSeleccionado.name }}
@@ -493,7 +497,6 @@ const logout = async () => {
                                 {{ m.mensaje }}
                             </p>
 
-                            <!-- La hora -->
                             <small :class="[m.id_usuario != adminSeleccionado.id ? 'text-white-50 text-end' : 'text-muted', 'd-block mt-1']" style="font-size: 0.65rem;">
                                 {{ formatHora(m.created_at) }}
                             </small>
@@ -501,7 +504,6 @@ const logout = async () => {
                     </div>
                 </div>
 
-                <!-- FORMULARIO DE ENVÍO -->
                 <div class="p-3 bg-white border-top">
                     <form @submit.prevent="enviarMensaje" class="d-flex gap-2">
                         <input type="text" v-model="nuevoMensaje" class="form-control bg-light border-0 shadow-none rounded-pill px-3" placeholder="Mensaje..." required autocomplete="off">
@@ -515,7 +517,7 @@ const logout = async () => {
         </div>
     </div>
 
-    <!-- 🔥 CAMBIO: MODAL DE PERFIL AGREGADO AQUÍ -->
+    <!-- MODAL DE PERFIL -->
     <div class="modal fade" id="perfilModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
@@ -528,12 +530,10 @@ const logout = async () => {
                 <div class="modal-body px-4 py-4">
                     <form @submit.prevent="actualizarPerfil">
 
-                        <!-- ZONA DE FOTO DE PERFIL -->
                         <div class="text-center mb-4">
                             <div class="position-relative d-inline-block mb-3">
                                 <img :src="fotoPreview || avatarUsuario" alt="Tu Perfil" class="rounded-circle shadow border border-3 border-white" style="width: 120px; height: 120px; object-fit: cover;">
 
-                                <!-- Botón flotante para subir foto -->
                                 <label for="avatarInput" class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle d-flex justify-content-center align-items-center shadow hover-shadow cursor-pointer" style="width: 35px; height: 35px; cursor: pointer; transform: translate(10%, 10%);">
                                     <span>📷</span>
                                 </label>
@@ -542,20 +542,17 @@ const logout = async () => {
                             <p class="text-muted small mb-0">Formatos: JPG, PNG. Max: 2MB.</p>
                         </div>
 
-                        <!-- ZONA DE NOMBRE -->
                         <div class="mb-3">
                             <label class="form-label fw-bold text-muted small">Nombre a mostrar</label>
                             <input type="text" v-model="nombreEdit" class="form-control bg-light border-0 shadow-none rounded-3 px-3 py-2" required>
                         </div>
 
-                        <!-- EMAIL (Solo lectura) -->
                         <div class="mb-4">
                             <label class="form-label fw-bold text-muted small">Correo Electrónico</label>
                             <input type="email" :value="usuarioLoggeado?.email" class="form-control border-0 shadow-none rounded-3 px-3 py-2 bg-secondary bg-opacity-10 text-muted" readonly disabled>
                             <small class="text-muted" style="font-size: 0.7rem;">El correo no se puede cambiar por motivos de seguridad.</small>
                         </div>
 
-                        <!-- BOTONES -->
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary fw-bold py-2 rounded-3 d-flex justify-content-center align-items-center" :disabled="cargandoPerfil">
                                 <span v-if="cargandoPerfil" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -567,7 +564,6 @@ const logout = async () => {
             </div>
         </div>
     </div>
-
 </template>
 
 <style scoped>

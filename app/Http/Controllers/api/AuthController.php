@@ -77,13 +77,6 @@ class AuthController extends Controller
                 ]);
             }
 
-            if(!$user || !Hash::check($request->password, $user->password)){
-                return response()->json([
-                    'valid' => false,
-                    'message' => 'Credenciales incorrectas'
-                ]);
-            }
-
             if($user->estatus == 0){
                 return response()->json([
                     'valid' => false,
