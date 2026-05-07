@@ -23,7 +23,7 @@ trait RegistraMovimientos
             ];
             $nombreItem = $nombresAmigables[$tabla] ?? $tabla;
 
-            // 2. Magia: Si modificamos un usuario y nos mandan su ID (número), buscamos su nombre
+            // 2. Si modificamos un usuario y nos mandan su ID (número), buscamos su nombre
             if ($tabla === 'usuarios' && is_numeric($identificador)) {
                 $usuarioAfectado = DB::table('users')->where('id', $identificador)->first();
                 if ($usuarioAfectado) {
@@ -32,20 +32,20 @@ trait RegistraMovimientos
             }
 
             $textos = [
-                'crear'    => "Creo un nuevo $nombreItem: $identificador",
-                'editar'   => "Actualizo el $nombreItem: $identificador",
-                'eliminar' => "Elimino el $nombreItem: $identificador"
+                'crear'    => "Creó un nuevo $nombreItem: $identificador",
+                'editar'   => "Actualizó el $nombreItem: $identificador",
+                'eliminar' => "Eliminó el $nombreItem: $identificador"
             ];
 
             $cambios = [
-                'mensaje'  => $textos[$accion] ?? "Accion no definida",
+                'mensaje'  => $textos[$accion] ?? "Acción no definida",
                 'tabla'    => $tabla,
                 'detalles' => $detalles
             ];
 
             DB::table('movimientos_usuarios')->insert([
                 'id_usuario'   => Auth::id(),
-                'cambios'      => json_encode($cambios),
+                'cambios'      => json_encode($cambios, JSON_UNESCAPED_UNICODE),
                 'tipo_mensaje' => $tipo_mensaje,
                 'created_at'   => now(),
                 'updated_at'   => now()
