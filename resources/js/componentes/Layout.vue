@@ -31,9 +31,9 @@ watch(() => props.usuarioLoggeado, (nuevoValor) => {
 
 // El computed definitivo: Usa lo que acabas de subir O lo que trae la base de datos
 const avatarUsuario = computed(() => {
-    const rutaFinal = avatarLocal.value || props.usuarioLoggeado?.avatar;
-    if (rutaFinal) {
-        return `http://localhost/${rutaFinal}`;
+    const nombreArchivo = avatarLocal.value || props.usuarioLoggeado?.avatar;
+    if (nombreArchivo) {
+        return `http://localhost/uploads/documentos/profile_pictures/${nombreArchivo}`;
     }
     return `https://ui-avatars.com/api/?name=${props.usuarioLoggeado?.name || 'User'}&background=0D6EFD&color=fff`;
 });

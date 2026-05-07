@@ -19,9 +19,9 @@ class ProfileController extends Controller
 
         if ($request->hasFile('avatar')) {
 
-            // 1. Borrar avatar anterior si existe (opcional pero recomendado)
+            // 1. Borrar avatar anterior si existe
             if ($user->avatar) {
-                $rutaVieja = base_path('../' . $user->avatar);
+                $rutaVieja = base_path('../uploads/documentos/profile_pictures/' . $user->avatar);
                 if (file_exists($rutaVieja)) {
                     unlink($rutaVieja);
                 }
@@ -40,8 +40,8 @@ class ProfileController extends Controller
             $nombreArchivo = 'Avatar-' . $user->id . '-' . date('His') . '.' . $archivo->getClientOriginalExtension();
             $archivo->move($carpetaDestino, $nombreArchivo);
 
-            // 5. Guardar la ruta relativa en la base de datos
-            $user->avatar = 'uploads/documentos/profile_pictures/' . $nombreArchivo;
+            // 5. ¡AQUÍ ESTÁ EL CAMBIO! Solo guardamos el nombre
+            $user->avatar = $nombreArchivo;
         }
 
         $user->save();
