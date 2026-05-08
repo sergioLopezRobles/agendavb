@@ -266,6 +266,41 @@ const logout = async () => {
     localStorage.removeItem('userRol');
     router.push('/');
 };
+
+const notificaciones = ref([]);
+const totalSinLeer = ref(0);
+const mostrarNotificaciones = ref(false);
+
+const cargarNotificaciones = async () => {
+    try {
+        const response = await fetch('/api/notificaciones', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        const data = await response.json();
+        if (data.valid) {
+            notificaciones.value = data.notificaciones;
+            totalSinLeer.value = data.sin_leer;
+        }
+    } catch (error) { console.error(error); }
+};
+
+const abrirNotificaciones = async () => {
+    mostrarNotificaciones.value = true;
+    if (totalSinLeer.value > 0) {
+        // Marcar como leídas en el servidor
+        await fetch('/api/notificaciones/leer', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        totalSinLeer.value = 0;
+    }
+};
+
+// Polling: Revisar notificaciones cada 2 minutos
+onMounted(() => {
+    cargarNotificaciones();
+    setInterval(cargarNotificaciones, 120000);
+});
 </script>
 
 <template>
@@ -374,9 +409,9 @@ const logout = async () => {
                             <span v-if="hayMensajesNuevos" class="position-absolute top-25 start-75 translate-middle p-1 bg-primary border border-light rounded-circle"></span>
                         </button>
 
-                        <button class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow">
+                        <button @click="abrirNotificaciones" class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow">
                             <span class="fs-5">🔔</span>
-                            <span class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                            <span v-if="totalSinLeer > 0" class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
                         </button>
 
                         <div class="dropdown ms-2">
@@ -560,6 +595,32 @@ const logout = async () => {
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="mostrarNotificaciones" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); z-index: 1060;">
+        <div class="modal-dialog modal-sm modal-dialog-centered" style="max-width: 350px;">
+            <div class="modal-content border-0 rounded-4 shadow-lg">
+                <div class="modal-header border-0 pb-0">
+                    <h6 class="fw-bold mb-0">Notificaciones</h6>
+                    <button type="button" class="btn-close shadow-none" @click="mostrarNotificaciones = false"></button>
+                </div>
+                <div class="modal-body p-3">
+                    <div v-if="notificaciones.length === 0" class="text-center py-4 text-muted small">
+                        No tienes notificaciones nuevas.
+                    </div>
+
+                    <div v-else class="list-group list-group-flush">
+                        <div v-for="n in notificaciones" :key="n.id" class="list-group-item border-0 rounded-3 mb-2 p-2 bg-light">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-bold text-primary">{{ n.titulo }}</small>
+                                <small class="text-muted" style="font-size: 0.6rem;">{{ formatHora(n.created_at) }}</small>
+                            </div>
+                            <p class="mb-0 small text-dark mt-1" style="line-height: 1.2;">{{ n.mensaje }}</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

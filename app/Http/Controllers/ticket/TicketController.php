@@ -148,10 +148,15 @@ class TicketController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // Envolvemos las dos operaciones en la transacción
             DB::transaction(function () use ($request, $id) {
 
-                // 1. Actualizamos el ticket
+                // Buscamos el ticket y el nombre del nuevo estado para el mensaje
+                $ticket = DB::table('ticket_soporte_usuarios_negocios')->where('id', $id)->first();
+                $estado = DB::table('estado_ticket_soporte_usuarios_negocios')
+                    ->where('id', $request->id_estado)
+                    ->first();
+
+                // Actualizamos el ticket
                 DB::table('ticket_soporte_usuarios_negocios')
                     ->where('id', $id)
                     ->update([
@@ -160,25 +165,51 @@ class TicketController extends Controller
                         'updated_at'   => Carbon::now()
                     ]);
 
-                // 2. Guardamos el log
-                // Si esto falla por alguna razón, el ticket vuelve a su estado anterior automáticamente
+                //CREAR NOTIFICACIÓN PARA EL DUEÑO
+                DB::table('notificaciones')->insert([
+                    'id_usuario' => $ticket->id_usuario,
+                    'titulo'     => 'Actualización de Ticket',
+                    'mensaje'    => "Un administrador ajustó el estado de tu ticket #{$id} a: " . ($estado->descripcion ?? 'Actualizado'),
+                    'leida'      => false,
+                    'created_at' => Carbon::now(),
+                    'updated_at' => Carbon::now()
+                ]);
+
                 $this->guardarLog('tickets', 'editar', $id, [
                     'id_prioridad' => $request->id_prioridad,
                     'id_estado'    => $request->id_estado
                 ]);
+            });
 
-            }); // Fin de la transacción
-
-            return response()->json([
-                'valid'   => true,
-                'message' => 'Ticket actualizado correctamente'
-            ]);
-
+            return response()->json(['valid' => true, 'message' => 'Ticket actualizado y dueño notificado']);
         } catch (\Exception $e) {
-            return response()->json([
-                'valid'   => false,
-                'message' => 'Error al actualizar el ticket: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['valid' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    // 2. Nueva función para que el Dueño descargue sus avisos
+    public function obtenerNotificaciones()
+    {
+        $notificaciones = DB::table('notificaciones')
+            ->where('id_usuario', Auth::id())
+            ->orderBy('created_at', 'desc')
+            ->limit(10) // Solo las últimas 10
+            ->get();
+
+        return response()->json([
+            'valid' => true,
+            'notificaciones' => $notificaciones,
+            'sin_leer' => $notificaciones->where('leida', false)->count()
+        ]);
+    }
+
+    // 3. Función para limpiar el puntito rojo
+    public function marcarNotificacionesLeidas()
+    {
+        DB::table('notificaciones')
+            ->where('id_usuario', Auth::id())
+            ->update(['leida' => true]);
+
+        return response()->json(['valid' => true]);
     }
 }

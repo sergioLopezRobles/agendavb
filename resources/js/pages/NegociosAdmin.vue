@@ -200,7 +200,7 @@ onMounted(() => {
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Directorio de Dueños</h4>
-                <p class="text-muted small mb-0">Gestión de usuarios y sus sucursales operativas</p>
+                <p class="text-muted small mb-0">Gestión de dueños y sus negocios</p>
             </div>
             <div class="text-end">
                 <span class="badge bg-primary fs-6 px-3 py-2 rounded-pill shadow-sm">
@@ -487,7 +487,7 @@ onMounted(() => {
                             </div>
 
                             <div class="col-md-6 ps-4">
-                                <h6 class="fw-bold mb-3">🏆 Servicios más solicitados</h6>
+                                <h6 class="fw-bold mb-3"> Servicios más solicitados</h6>
                                 <div v-for="(ser, index) in datosStats?.topServicios" :key="index" class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded-3">
                                     <span class="small fw-bold text-dark">{{ ser.nombre }}</span>
                                     <span class="badge bg-dark rounded-pill">{{ ser.total }} citas</span>
