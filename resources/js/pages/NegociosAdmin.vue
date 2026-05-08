@@ -98,7 +98,9 @@ const duenosFiltrados = computed(() => {
 
 // Helpers de Imágenes
 const obtenerAvatarDueno = (avatarUrl, nombre) => {
-    if (avatarUrl) return `http://localhost/${avatarUrl}`;
+    if (avatarUrl) {
+        return `http://localhost/uploads/documentos/profile_pictures/${avatarUrl}`;
+    }
     return `https://ui-avatars.com/api/?name=${nombre}&background=0D6EFD&color=fff`;
 };
 
@@ -243,7 +245,9 @@ onMounted(() => {
                                     </div>
                                     <div>
                                         <div class="fw-bold text-dark fs-6">{{ d.dueno_nombre }}</div>
-                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill" style="font-size: 0.65rem;">ID: {{ d.id }}</span>
+                                        <span :class="['badge rounded-pill', d.id_rol === 1 ? 'bg-dark' : 'bg-info text-dark']" style="font-size: 0.65rem;">
+                                            {{ d.rol_nombre }}
+                                        </span>
                                     </div>
                                 </div>
                             </td>
@@ -253,10 +257,12 @@ onMounted(() => {
                             </td>
                             <td class="px-4 py-3">
                                 <div class="mb-1">
-                                    <span class="badge bg-primary bg-gradient rounded-pill">Plan {{ d.plan_nombre || 'Básico' }}</span>
+                                    <span :class="['badge rounded-pill shadow-sm', d.plan_nombre === 'SIN PLAN' ? 'bg-secondary' : 'bg-primary bg-gradient']">
+                                        {{ d.plan_nombre }}
+                                    </span>
                                 </div>
                                 <div class="text-muted small">
-                                    📅 Registrado: {{ d.fecha_registro }}
+                                    <span title="Fecha de registro en la plataforma">📅 Registro: {{ d.fecha_registro }}</span>
                                 </div>
                             </td>
                             <td class="px-4 py-3 text-center">

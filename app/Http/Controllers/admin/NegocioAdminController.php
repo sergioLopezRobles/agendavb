@@ -9,44 +9,46 @@ class NegocioAdminController extends Controller
 {
     public function index()
     {
-        // 1. Obtenemos a los dueños (id_rol = 2)
-        $duenos = DB::table('users as u')
+        // 1. Obtenemos a los usuarios (Admins y Dueños) para el directorio
+        $usuarios = DB::table('users as u')
             ->join('roles_usuarios as ru', 'u.id', '=', 'ru.id_usuario')
+            ->join('roles as r', 'ru.id_rol', '=', 'r.id')
             ->select(
                 'u.id',
                 'u.name as dueno_nombre',
                 'u.email as dueno_email',
                 'u.telefono as dueno_telefono',
                 'u.avatar as dueno_avatar',
+                'r.titulo as rol_nombre',
+                'ru.id_rol',
                 DB::raw("DATE_FORMAT(u.created_at, '%d/%m/%Y') as fecha_registro")
             )
-            ->where('ru.id_rol', 2)
+            ->whereIn('ru.id_rol', [1, 2]) //Admins (1) y Dueños (2)
             ->orderBy('u.id', 'desc')
             ->get();
 
-        // 2. Iteramos cada dueño para agregarle su plan y sus negocios
-        foreach ($duenos as $dueno) {
-
-            // Buscamos el plan del dueño
+        foreach ($usuarios as $u) {
+            // Buscamos el plan
             $plan = DB::table('plan_usuarios as pu')
                 ->join('planes as p', 'pu.id_plan', '=', 'p.id')
-                ->where('pu.id_usuario', $dueno->id)
+                ->where('pu.id_usuario', $u->id)
                 ->select('p.nombre')
                 ->first();
 
-            $dueno->plan_nombre = $plan ? $plan->nombre : 'Básico';
+            // Si no hay plan, sale SIN PLAN
+            $u->plan_nombre = $plan ? $plan->nombre : 'SIN PLAN';
 
-            // Buscamos sus negocios y los anidamos adentro
-            $dueno->negocios = DB::table('negocios')
+            // Buscamos sus negocios
+            $u->negocios = DB::table('negocios')
                 ->select('id', 'nombre', 'email', 'logo', 'direccion', 'whatsapp_creditos')
-                ->where('id_usuario', $dueno->id)
+                ->where('id_usuario', $u->id)
                 ->orderBy('id', 'desc')
                 ->get();
         }
 
         return response()->json([
             'valid' => true,
-            'duenos' => $duenos
+            'duenos' => $usuarios
         ]);
     }
 
@@ -89,7 +91,7 @@ class NegocioAdminController extends Controller
         $mesActual = \Carbon\Carbon::now()->month;
         $anioActual = \Carbon\Carbon::now()->year;
 
-        // 1. Conteo dinámico haciendo JOIN a tu tabla 'estados_cita'
+        // 1. Conteo dinámico haciendo JOIN a tabla 'estados_cita'
         $statsEstados = DB::table('citas as c')
             ->join('estados_cita as e', 'c.id_estado', '=', 'e.id')
             ->select('e.titulo as estado', DB::raw('count(c.id) as total'))
