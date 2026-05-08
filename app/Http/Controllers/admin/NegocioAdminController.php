@@ -9,27 +9,44 @@ class NegocioAdminController extends Controller
 {
     public function index()
     {
-        $negocios = DB::table('negocios as n')
-            ->join('users as u', 'n.id_usuario', '=', 'u.id')
-            ->leftJoin('planes as p', 'n.id_plan', '=', 'p.id')
+        // 1. Obtenemos a los dueños (id_rol = 2)
+        $duenos = DB::table('users as u')
+            ->join('roles_usuarios as ru', 'u.id', '=', 'ru.id_usuario')
             ->select(
-                'n.id',
-                'n.nombre as negocio_nombre',
-                'n.email as negocio_email',
-                'n.logo',
-                'n.direccion',
-                'n.whatsapp_creditos',
+                'u.id',
                 'u.name as dueno_nombre',
+                'u.email as dueno_email',
                 'u.telefono as dueno_telefono',
-                'p.nombre as plan_nombre',
-                DB::raw("DATE_FORMAT(n.created_at, '%d/%m/%Y') as fecha_creacion")
+                'u.avatar as dueno_avatar',
+                DB::raw("DATE_FORMAT(u.created_at, '%d/%m/%Y') as fecha_registro")
             )
-            ->orderBy('n.id', 'desc')
+            ->where('ru.id_rol', 2)
+            ->orderBy('u.id', 'desc')
             ->get();
+
+        // 2. Iteramos cada dueño para agregarle su plan y sus negocios
+        foreach ($duenos as $dueno) {
+
+            // Buscamos el plan del dueño
+            $plan = DB::table('plan_usuarios as pu')
+                ->join('planes as p', 'pu.id_plan', '=', 'p.id')
+                ->where('pu.id_usuario', $dueno->id)
+                ->select('p.nombre')
+                ->first();
+
+            $dueno->plan_nombre = $plan ? $plan->nombre : 'Básico';
+
+            // Buscamos sus negocios y los anidamos adentro
+            $dueno->negocios = DB::table('negocios')
+                ->select('id', 'nombre', 'email', 'logo', 'direccion', 'whatsapp_creditos')
+                ->where('id_usuario', $dueno->id)
+                ->orderBy('id', 'desc')
+                ->get();
+        }
 
         return response()->json([
             'valid' => true,
-            'negocios' => $negocios
+            'duenos' => $duenos
         ]);
     }
 
