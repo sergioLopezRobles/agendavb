@@ -278,10 +278,30 @@ const cargarNotificaciones = async () => {
         });
         const data = await response.json();
         if (data.valid) {
+            // Si la cantidad sin leer es mayor a la que teníamos, significa que llegó una nueva
+            if (data.sin_leer > totalSinLeer.value && data.notificaciones.length > 0) {
+                const nueva = data.notificaciones[0];
+                if (window.$toast) {
+                    // Disparamos el Toast de 5 segundos (5000ms)
+                    window.$toast.show(`🔔 ${nueva.titulo}`, 'info', 5000);
+                }
+            }
             notificaciones.value = data.notificaciones;
             totalSinLeer.value = data.sin_leer;
         }
     } catch (error) { console.error(error); }
+};
+
+const marcarNotificacionesLeidas = async () => {
+    if (totalSinLeer.value > 0) {
+        try {
+            await fetch('/api/notificaciones/leer', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            totalSinLeer.value = 0;
+        } catch (error) { console.error(error); }
+    }
 };
 
 const abrirNotificaciones = async () => {
@@ -296,7 +316,7 @@ const abrirNotificaciones = async () => {
     }
 };
 
-// Polling: Revisar notificaciones cada 2 minutos
+// Se ejecuta al cargar
 onMounted(() => {
     cargarNotificaciones();
     setInterval(cargarNotificaciones, 120000);
@@ -409,10 +429,38 @@ onMounted(() => {
                             <span v-if="hayMensajesNuevos" class="position-absolute top-25 start-75 translate-middle p-1 bg-primary border border-light rounded-circle"></span>
                         </button>
 
-                        <button @click="abrirNotificaciones" class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow">
-                            <span class="fs-5">🔔</span>
-                            <span v-if="totalSinLeer > 0" class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
-                        </button>
+                        <div class="dropdown">
+                            <!-- El botón ahora abre el menú desplegable y marca como leído -->
+                            <button @click="marcarNotificacionesLeidas" class="btn btn-light border-0 rounded-circle position-relative p-2 hover-shadow" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
+                                <span class="fs-5">🔔</span>
+                                <span v-if="totalSinLeer > 0" class="position-absolute top-25 start-75 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                            </button>
+
+                            <!-- Menú Desplegable -->
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-0 rounded-4 overflow-hidden" style="width: 340px;">
+                                <li class="bg-light border-bottom px-4 py-3 d-flex justify-content-between align-items-center">
+                                    <h6 class="fw-bold mb-0 text-dark">Notificaciones</h6>
+                                    <span v-if="totalSinLeer > 0" class="badge bg-primary rounded-pill">{{ totalSinLeer }} nuevas</span>
+                                </li>
+
+                                <!-- Contenedor con Scroll para ~5 notificaciones -->
+                                <li class="overflow-auto" style="max-height: 380px;">
+                                    <div v-if="notificaciones.length === 0" class="text-center py-5 text-muted small">
+                                        No tienes notificaciones recientes.
+                                    </div>
+
+                                    <div v-else class="list-group list-group-flush">
+                                        <div v-for="n in notificaciones" :key="n.id" class="list-group-item border-bottom border-0 p-3 hover-bg-light">
+                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                <small class="fw-bold text-primary">{{ n.titulo }}</small>
+                                                <small class="text-muted" style="font-size: 0.65rem;">{{ formatHora(n.created_at) }}</small>
+                                            </div>
+                                            <p class="mb-0 small text-dark" style="line-height: 1.3;">{{ n.mensaje }}</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
 
                         <div class="dropdown ms-2">
                             <button class="btn border-0 p-0 rounded-circle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -595,32 +643,6 @@ onMounted(() => {
                             </button>
                         </div>
                     </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="mostrarNotificaciones" class="modal fade show d-block" style="background: rgba(0,0,0,0.5); z-index: 1060;">
-        <div class="modal-dialog modal-sm modal-dialog-centered" style="max-width: 350px;">
-            <div class="modal-content border-0 rounded-4 shadow-lg">
-                <div class="modal-header border-0 pb-0">
-                    <h6 class="fw-bold mb-0">Notificaciones</h6>
-                    <button type="button" class="btn-close shadow-none" @click="mostrarNotificaciones = false"></button>
-                </div>
-                <div class="modal-body p-3">
-                    <div v-if="notificaciones.length === 0" class="text-center py-4 text-muted small">
-                        No tienes notificaciones nuevas.
-                    </div>
-
-                    <div v-else class="list-group list-group-flush">
-                        <div v-for="n in notificaciones" :key="n.id" class="list-group-item border-0 rounded-3 mb-2 p-2 bg-light">
-                            <div class="d-flex justify-content-between">
-                                <small class="fw-bold text-primary">{{ n.titulo }}</small>
-                                <small class="text-muted" style="font-size: 0.6rem;">{{ formatHora(n.created_at) }}</small>
-                            </div>
-                            <p class="mb-0 small text-dark mt-1" style="line-height: 1.2;">{{ n.mensaje }}</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

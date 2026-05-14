@@ -329,10 +329,10 @@ onMounted(() => {
                                         <button @click="abrirServicios(n)" class="btn btn-sm btn-outline-primary fw-bold rounded-3 px-3 d-flex align-items-center">
                                             <span>✂️ Servicios</span>
                                         </button>
-                                        <button @click="abrirAgenda(n)" class="btn btn-sm btn-outline-info fw-bold rounded-3 px-3 d-flex align-items-center">
+                                        <button @click="abrirAgenda(n)" class="btn btn-sm btn-outline-dark fw-bold rounded-3 px-3 d-flex align-items-center">
                                             <span>📅 Citas</span>
                                         </button>
-                                        <button @click="abrirStats(n)" class="btn btn-sm btn-outline-dark fw-bold rounded-3 px-3 d-flex align-items-center">
+                                        <button @click="abrirStats(n)" class="btn btn-sm btn-outline-success fw-bold rounded-3 px-3 d-flex align-items-center">
                                             <span>📊 Stats</span>
                                         </button>
                                     </div>

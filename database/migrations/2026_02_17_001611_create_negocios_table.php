@@ -17,9 +17,6 @@ return new class extends Migration
             $table->string('email');
             $table->string('logo')->nullable();
             $table->string('direccion')->nullable();
-            $table->string('whatsapp_creditos')->default('0');
-            $table->string('hora_inicio')->nullable();
-            $table->string('hora_fin')->nullable();
             $table->timestamps();
         });
     }
