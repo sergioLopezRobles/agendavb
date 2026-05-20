@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Traits\RegistraMovimientos;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class AuthController extends Controller
 {
@@ -133,5 +134,34 @@ class AuthController extends Controller
             'valid' => true,
             'message' => 'Logout exitoso'
         ]);
+    }
+
+    public function resetPassword(Request $request) {
+        $request->validate([
+            'telefono' => 'required|string|size:10',
+            'codigo' => 'required|string',
+            'password' => 'required|string|min:6'
+        ]);
+
+        // Verificamos el código usando la caché que genera el TwilioController
+        $codigoGuardado = Cache::get('codigo_verificacion_' . $request->telefono);
+
+        if (!$codigoGuardado || $codigoGuardado != $request->codigo) {
+            return response()->json(['valid' => false, 'message' => 'Código SMS incorrecto o expirado']);
+        }
+
+        // Buscamos al usuario por su número
+        $user = User::where('telefono', $request->telefono)->first();
+        if (!$user) {
+            return response()->json(['valid' => false, 'message' => 'No existe ninguna cuenta registrada con este número.']);
+        }
+
+        // Actualizamos la contraseña y destruimos el código temporal
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        Cache::forget('codigo_verificacion_' . $request->telefono);
+
+        return response()->json(['valid' => true, 'message' => 'Contraseña actualizada correctamente']);
     }
 }

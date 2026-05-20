@@ -218,7 +218,10 @@ const formatoMoneda = (cantidad) => {
                         <div class="card-body d-flex justify-content-between align-items-center">
                             <div>
                                 <h6 class="text-muted fw-bold mb-2">Créditos WhatsApp</h6>
-                                <h3 class="fw-bold mb-0 text-success">{{ planAdquirido?.whatsapp_creditos_iniciales || '0' }}</h3>
+                                <h3 class="fw-bold mb-0 text-success">
+                                    {{ planAdquirido?.creditos_restantes || '0' }}
+                                    <span class="fs-6 text-muted fw-normal">/ {{ planAdquirido?.whatsapp_creditos_iniciales || '0' }}</span>
+                                </h3>
                             </div>
                             <span class="fs-4 text-success opacity-50">💬</span>
                         </div>

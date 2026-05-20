@@ -18,15 +18,13 @@ class DashboardController extends Controller
     public function index(){
         $idUsuario = Auth::id();
 
-        // 1. Obtenemos al usuario con su plan y su rol
         $usuarioLoggeado = DB::table('users as u')
             ->leftJoin('plan_usuarios as pu', 'u.id', '=', 'pu.id_usuario')
             ->leftJoin('roles_usuarios as ru', 'u.id', '=', 'ru.id_usuario')
-            ->select('pu.id_plan', 'u.email', 'u.name', 'ru.id_rol')
+            ->select('u.id', 'pu.id_plan', 'u.email', 'u.name', 'u.telefono', 'u.avatar', 'ru.id_rol')
             ->where('u.id', $idUsuario)
             ->first();
 
-        // Forzamos Rol Dueño si no tiene
         if ($usuarioLoggeado && $usuarioLoggeado->id_rol == null) {
             $usuarioLoggeado->id_rol = 2;
         }
@@ -37,18 +35,14 @@ class DashboardController extends Controller
             // LÓGICA PARA EL ADMINISTRADOR (ROL 1)
             // =========================================================
             if ($usuarioLoggeado->id_rol == 1) {
-
-                // 1. Cálculo del MRR (Sumamos el valor del plan de los usuarios activos)
+                // ... (Tu código de MRR, Citas y Auditoría se queda exactamente igual)
                 $mrr = DB::table('plan_usuarios')
                     ->join('caracteristicasplanes', 'plan_usuarios.id_plan', '=', 'caracteristicasplanes.id_plan')
                     ->where('caracteristicasplanes.titulo', 'precio')
                     ->sum(DB::raw('CAST(caracteristicasplanes.valor AS DECIMAL(10,2))'));
 
-                // 2. Uso del sistema (Total de citas procesadas)
-                // Cambia 'citas_negocios' si tu tabla se llama distinto
                 $totalCitas = DB::table('citas')->count();
 
-                // 3. Auditoría: Obtenemos los últimos 15 logs
                 $logsData = DB::table('movimientos_usuarios as m')
                     ->join('users as u', 'm.id_usuario', '=', 'u.id')
                     ->select('m.id', 'u.name as usuario_nombre', 'm.cambios', 'm.tipo_mensaje', DB::raw("DATE_FORMAT(m.created_at, '%d/%m/%Y %H:%i') as fecha"))
@@ -56,7 +50,6 @@ class DashboardController extends Controller
                     ->limit(15)
                     ->get()
                     ->map(function ($log) {
-                        // Decodificamos el JSON que guardaste desde tu Trait
                         $log->cambios = json_decode($log->cambios);
                         return $log;
                     });
@@ -86,36 +79,52 @@ class DashboardController extends Controller
 
             $hoy = \Carbon\Carbon::now()->format('Y-m-d');
             $citasHoy = DB::table('citas')
-            ->join('negocios', 'citas.id_negocio', '=', 'negocios.id')
+                ->join('negocios', 'citas.id_negocio', '=', 'negocios.id')
                 ->where('negocios.id_usuario', $idUsuario)
                 ->where('citas.fecha', $hoy)
                 ->count();
-            // --------------------------------------------------
 
+            // Declaramos variables por defecto por si no tiene plan
+            $planAdquirido = null;
+            $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
+
+            // Solo hacemos los cálculos matemáticos si SÍ tiene un plan
             if($usuarioLoggeado->id_plan != null){
                 $globalFuncion = new \App\Clases\GlobalFuncion();
                 $planAdquirido = $globalFuncion->obtenerPlanCompleto($usuarioLoggeado->id_plan);
-                $prioridadesTicket = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
 
-                // --- LÓGICA RECUPERADA: VALIDACIÓN DEL DÍA PARA EL EXCEL ---
-                $hoy = \Carbon\Carbon::now()->dayOfWeek; // 0 (Domingo) a 6 (Sábado)
+                // Lógica de Descarga de Excel
+                $hoySemana = \Carbon\Carbon::now()->dayOfWeek;
                 if (isset($planAdquirido->dias_respaldo_calendario) && $planAdquirido->dias_respaldo_calendario !== null) {
                     $cadenaLimpia = str_replace(' ', '', $planAdquirido->dias_respaldo_calendario);
                     $diasPermitidos = explode(',', $cadenaLimpia);
-                    $planAdquirido->puede_descargar_hoy = in_array((string)$hoy, $diasPermitidos);
+                    $planAdquirido->puede_descargar_hoy = in_array((string)$hoySemana, $diasPermitidos);
                 } else {
                     $planAdquirido->puede_descargar_hoy = false;
                 }
-                // ------------------------------------------------------------
 
-                return response()->json([
-                    'valid' => true,
-                    'planAdquirido' => $planAdquirido,
-                    'usuarioLoggeado' => $usuarioLoggeado,
-                    'cantidadNegocios' => $cantidadNegocios,
-                    'prioridadesTicket' => $prioridadesTicket
-                ]);
+                // Lógica de Créditos de WhatsApp
+                $mesActual = \Carbon\Carbon::now()->month;
+                $anioActual = \Carbon\Carbon::now()->year;
+
+                $creditosGastados = DB::table('creditos_whatsapp_negocio as cw')
+                    ->join('negocios as n', 'cw.id_negocio', '=', 'n.id')
+                    ->where('n.id_usuario', $idUsuario)
+                    ->whereMonth('cw.created_at', $mesActual)
+                    ->whereYear('cw.created_at', $anioActual)
+                    ->count();
+
+                $limiteCreditos = (int)($planAdquirido->whatsapp_creditos_iniciales ?? 0);
+                $planAdquirido->creditos_restantes = max(0, $limiteCreditos - $creditosGastados);
             }
+
+            return response()->json([
+                'valid' => true,
+                'planAdquirido' => $planAdquirido,
+                'usuarioLoggeado' => $usuarioLoggeado,
+                'cantidadNegocios' => $cantidadNegocios,
+                'prioridadesTicket' => $prioridadesTicket
+            ]);
         }
 
         return response()->json(['valid' => false, 'planAdquirido' => null]);

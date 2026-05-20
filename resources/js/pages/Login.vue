@@ -73,11 +73,12 @@ const login = async () => {
 
         <div class="col-md-6 col-lg-5 w-40">
             <div class="card shadow-lg border-0 rounded-4">
-                <div class="card-body p-5"> <div class="text-center mb-4">
-                    <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center" style="width: 80px; height: 80px;">
-                        <span class="fs-1">🏢</span>
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <div class="bg-light rounded-circle d-inline-flex justify-content-center align-items-center" style="width: 80px; height: 80px;">
+                            <span class="fs-1">🏢</span>
+                        </div>
                     </div>
-                </div>
 
                     <h2 class="text-center text-primary fw-bold mb-2">Bienvenido</h2>
                     <p class="text-center text-muted mb-5">Ingresa a tu cuenta para continuar</p>
@@ -99,7 +100,9 @@ const login = async () => {
                     <div class="mb-4">
                         <div class="d-flex justify-content-between">
                             <label class="form-label fw-semibold">Contraseña</label>
-                            <a href="#" class="text-decoration-none small text-primary fw-semibold">¿Olvidaste tu contraseña?</a>
+                            <router-link to="/recuperar-password" class="text-decoration-none small text-primary fw-semibold">
+                                ¿Olvidaste tu contraseña?
+                            </router-link>
                         </div>
                         <input
                             v-model="password"
@@ -138,5 +141,4 @@ const login = async () => {
         </div>
 
     </div>
-
 </template>

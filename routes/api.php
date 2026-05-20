@@ -39,6 +39,8 @@ Route::get('/citasclientes/{slug}', [CitasClientesController::class, 'citasclien
 Route::post('/registrar-cita-cliente', [CitasClientesController::class, 'registrarcitacliente']);
 Route::post('/horarios-disponibles', [CitasClientesController::class, 'horariosdisponibles']);
 
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
 // 2. ZONA COMPARTIDA (Admins y Dueños)
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', [AuthController::class, 'user']);

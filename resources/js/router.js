@@ -14,6 +14,9 @@ import UsuariosAdmin from "./componentes/UsuariosAdmin.vue";
 import AuditoriaAdmin from "./pages/AuditoriaAdmin.vue";
 import NegociosAdmin from "./pages/NegociosAdmin.vue";
 
+// 1. Importamos el componente de recuperación
+import RecuperarPassword from "./componentes/RecuperarPassword.vue";
+
 const routes = [
     {
         path: '/',
@@ -26,6 +29,11 @@ const routes = [
     {
         path: '/register',
         component: Register
+    },
+    // 2. Registramos la nueva ruta
+    {
+        path: '/recuperar-password',
+        component: RecuperarPassword
     },
     {
         path: '/dashboard',
@@ -82,6 +90,7 @@ const routes = [
         component: NegociosAdmin,
         meta: { requiresAuth: true }
     },
+    // Ojo: Esta ruta con el comodín (slug) siempre debe ir al final
     {
         path: '/:slug',
         component: CitasClientes,
@@ -95,10 +104,11 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const token = localStorage.getItem('token')
-    const publicpages = ['/', '/login', '/register', '/citasclientes'] // el comodín no va en este arreglo
+
+    // 3. Agregamos la ruta aquí para que un usuario logueado no pueda ver la pantalla de recuperar
+    const publicpages = ['/', '/login', '/register', '/citasclientes', '/recuperar-password']
     const authrequired = to.meta.requiresAuth
 
-    // Validamos si la ruta a la que va no requiere auth (es pública)
     const ispublic = !authrequired;
 
     if (authrequired && !token) {

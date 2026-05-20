@@ -22,7 +22,7 @@ const codigoError = ref('')
 const enviandoCodigo = ref(false)
 const codigoEnviado = ref(false)
 const verificandoCodigo = ref(false)
-const numeroVerificado = ref(true)
+const numeroVerificado = ref(false)
 
 const enviarCodigoSMS = async () => {
     telefonoError.value = ''
@@ -107,30 +107,31 @@ const validar = () => {
         telefonoError.value = 'Ingresa tu número de 10 dígitos.'
         valido = false
     }
-    // COMENTAR ESTE BLOQUE PARA SALTAR LA VALIDACIÓN DE TWILIO
-/*else if (!numeroVerificado.value) {
-    telefonoError.value = 'Debes verificar tu número para continuar.'
-    window.$toast.show('Verifica tu número de teléfono primero', 'warning', 3000)
-    valido = false
-} */
 
-if (!password.value) {
-    passwordError.value = 'La contraseña es obligatoria.'
-    valido = false
-} else if (password.value.length < 6) {
-    passwordError.value = 'La contraseña debe tener al menos 6 caracteres.'
-    valido = false
-}
+    //verificación
+    else if (!numeroVerificado.value) {
+        telefonoError.value = 'Debes verificar tu número para continuar.'
+        window.$toast.show('Verifica tu número de teléfono primero', 'warning', 3000)
+        valido = false
+    }
 
-if (!confirmPassword.value) {
-    confirmPasswordError.value = 'Debes confirmar tu contraseña.'
-    valido = false
-} else if (password.value !== confirmPassword.value) {
-    confirmPasswordError.value = 'Las contraseñas no coinciden.'
-    valido = false
-}
+    if (!password.value) {
+        passwordError.value = 'La contraseña es obligatoria.'
+        valido = false
+    } else if (password.value.length < 6) {
+        passwordError.value = 'La contraseña debe tener al menos 6 caracteres.'
+        valido = false
+    }
 
-return valido
+    if (!confirmPassword.value) {
+        confirmPasswordError.value = 'Debes confirmar tu contraseña.'
+        valido = false
+    } else if (password.value !== confirmPassword.value) {
+        confirmPasswordError.value = 'Las contraseñas no coinciden.'
+        valido = false
+    }
+
+    return valido
 }
 
 const register = async () => {
@@ -194,9 +195,25 @@ const register = async () => {
                             <label class="form-label fw-semibold">Teléfono Celular</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-0">🇲🇽 +52</span>
-                                <input v-model="telefono" type="tel" class="form-control form-control-lg bg-light border-0" :class="{ 'is-invalid': telefonoError }" placeholder="10 dígitos" maxlength="10" @input="telefono = telefono.replace(/\D/g, '')">
+                                <input v-model="telefono" type="tel" class="form-control form-control-lg bg-light border-0" :class="{ 'is-invalid': telefonoError, 'is-valid': numeroVerificado }" placeholder="10 dígitos" maxlength="10" @input="telefono = telefono.replace(/\D/g, '')" :disabled="numeroVerificado">
+
+                                <button v-if="!numeroVerificado" @click="enviarCodigoSMS" class="btn btn-outline-primary fw-bold" type="button" :disabled="enviandoCodigo || telefono.length !== 10">
+                                    {{ enviandoCodigo ? 'Enviando...' : 'Validar numero' }}
+                                </button>
+                                <span v-else class="input-group-text bg-success text-white border-0 fw-bold">✅</span>
                             </div>
                             <div class="text-danger small fw-medium mt-1" v-if="telefonoError">{{ telefonoError }}</div>
+                        </div>
+
+                        <div v-if="codigoEnviado && !numeroVerificado" class="col-12 bg-primary bg-opacity-10 p-3 rounded-3 mt-2">
+                            <label class="form-label fw-bold text-primary small">Ingresa el código de 6 dígitos</label>
+                            <div class="input-group">
+                                <input v-model="codigo" type="text" class="form-control bg-white border-0" placeholder="Ej. 123456" maxlength="6">
+                                <button @click="verificarCodigoSMS" class="btn btn-primary fw-bold" type="button" :disabled="verificandoCodigo">
+                                    {{ verificandoCodigo ? 'Verificando...' : 'Validar' }}
+                                </button>
+                            </div>
+                            <div class="text-danger small fw-medium mt-1" v-if="codigoError">{{ codigoError }}</div>
                         </div>
 
                         <div class="col-md-6 mt-3">
@@ -212,7 +229,7 @@ const register = async () => {
                         </div>
                     </div>
 
-                    <button @click="register" class="btn btn-primary w-100 py-3 fw-bold fs-5 mb-3 mt-4 rounded-3 shadow-sm">
+                    <button @click="register" class="btn btn-primary w-100 py-3 fw-bold fs-5 mb-3 mt-4 rounded-3 shadow-sm" :disabled="!numeroVerificado">
                         Crear cuenta segura
                     </button>
 

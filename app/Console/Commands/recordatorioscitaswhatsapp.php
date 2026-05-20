@@ -17,23 +17,20 @@ class recordatorioscitaswhatsapp extends Command
     {
         Log::info('--- Ejecutando Escaneo de Citas ---');
 
-        // 1. IMPORTANTE: Asegúrate de que Carbon use la hora de México/Tepic
         $ahora = Carbon::now('America/Mazatlan');
 
         $citas = DB::table('citas')
             ->join('negocios', 'citas.id_negocio', '=', 'negocios.id')
-            // Join con la tabla de características filtrando solo los minutos de recordatorio
             ->join('caracteristicasplanes', function($join) {
                 $join->on('negocios.id_plan', '=', 'caracteristicasplanes.id_plan')
                     ->where('caracteristicasplanes.titulo', '=', 'recordatorio_minutos');
             })
-            // Left Join para traer el nombre del servicio sin que desaparezcan las citas si hay error
             ->leftJoin('servicios', 'citas.id_servicio', '=', 'servicios.id')
             ->select(
                 'citas.*',
                 'negocios.nombre as negocio_nombre',
                 'caracteristicasplanes.valor as minutos_plan',
-                'servicios.nombre as servicio_nombre' //nombre del servicio
+                'servicios.nombre as servicio_nombre'
             )
             ->where('citas.id_estado', '0')
             ->where('citas.recordatorio_enviado', '0')
@@ -43,24 +40,50 @@ class recordatorioscitaswhatsapp extends Command
 
         foreach ($citas as $cita) {
             try {
-                // 2. PARSEAR HORA
                 $fechaHoraCita = Carbon::parse($cita->fecha . ' ' . $cita->hora, 'America/Mazatlan');
 
-                // 3. LÓGICA DE VENTANA DE TIEMPO
+                //3.LÓGICA DE VENTANA DE TIEMPO
                 $minutosParaLaCita = $ahora->diffInMinutes($fechaHoraCita, false);
                 $limitePlan = (int)$cita->minutos_plan;
 
-                // Solo enviar si la cita es a futuro y estamos dentro del tiempo del plan
+                //Solo evaluar si estamos en la ventana de tiempo correcta
                 if ($minutosParaLaCita > 0 && $minutosParaLaCita <= $limitePlan) {
 
-                    // --- NUEVA LÓGICA: Buscar los teléfonos del negocio ---
+                    //VALIDACIÓN DE CRÉDITOS ANTES DE ENVIAR NADA
+                    $idUsuarioDueno = DB::table('negocios')->where('id', $cita->id_negocio)->value('id_usuario');
+                    $idPlanDueno = DB::table('plan_usuarios')->where('id_usuario', $idUsuarioDueno)->value('id_plan');
+
+                    $limiteCreditosSaaS = (int) DB::table('caracteristicasplanes')
+                        ->where('id_plan', $idPlanDueno)
+                        ->where('titulo', 'whatsapp_creditos_iniciales')
+                        ->value('valor');
+
+                    $creditosGastados = DB::table('creditos_whatsapp_negocio as cw')
+                        ->join('negocios as n', 'cw.id_negocio', '=', 'n.id')
+                        ->where('n.id_usuario', $idUsuarioDueno)
+                        ->whereMonth('cw.created_at', $ahora->month)
+                        ->whereYear('cw.created_at', $ahora->year)
+                        ->count();
+
+                    // Si ya se acabaron los creditos, se cancela
+                    if ($creditosGastados >= $limiteCreditosSaaS) {
+                        Log::warning("Cita {$cita->id} omitida. El usuario {$idUsuarioDueno} agotó sus {$limiteCreditosSaaS} créditos.");
+
+                        // Marcamos como '2' para saber que falló por falta de créditos y no se quede en bucle
+                        DB::table('citas')->where('id', $cita->id)->update([
+                            'recordatorio_enviado' => '2',
+                            'updated_at' => Carbon::now('America/Mazatlan')
+                        ]);
+                        continue; // Saltamos a la siguiente cita del ciclo
+                    }
+
+                    // --- Buscar teléfonos ---
                     $telefonosNegocio = DB::table('numeros_telefonos_negocio')
                         ->join('tipos_numero_telefono', 'numeros_telefonos_negocio.id_tipo_numero_telefono', '=', 'tipos_numero_telefono.id')
                         ->where('numeros_telefonos_negocio.id_negocio', $cita->id_negocio)
                         ->select('numeros_telefonos_negocio.numero_telefono', 'tipos_numero_telefono.tipo_numero_telefono')
                         ->get();
 
-                    // Armamos la lista en texto
                     $textoTelefonos = "";
                     if ($telefonosNegocio->isEmpty()) {
                         $textoTelefonos = "nuestros medios oficiales";
@@ -71,27 +94,38 @@ class recordatorioscitaswhatsapp extends Command
                         }
                         $textoTelefonos = implode(", ", $arregloTelefonos);
                     }
-                    // --------------------------------------------------------
 
                     $telefonoParaWA = '52' . $cita->cliente_telefono;
 
-                    // Llamada al servicio con las 6 variables dinámicas
+                    // 4. LLAMADA AL SERVICIO (Envío a Meta)
                     $waService->enviarRecordatorioCita(
                         $telefonoParaWA,
                         $cita->cliente_nombre,
                         $cita->fecha,
                         $cita->hora,
-                        $cita->servicio_nombre ?? 'Servicio Programado', // Fallback por si lo borraron
+                        $cita->servicio_nombre ?? 'Servicio Programado',
                         $cita->negocio_nombre,
-                        trim($textoTelefonos) // La lista armada (trim quita espacios o saltos de línea al final)
+                        trim($textoTelefonos)
                     );
 
-                    DB::table('citas')->where('id', $cita->id)->update([
-                        'recordatorio_enviado' => '1',
-                        'updated_at' => Carbon::now()
-                    ]);
+                    //5.REGISTRAMOS EL MOVIMIENTO EXITOSO
+                    DB::transaction(function () use ($cita, $ahora) {
+                        //Actualizamos la cita
+                        DB::table('citas')->where('id', $cita->id)->update([
+                            'recordatorio_enviado' => '1',
+                            'updated_at' => $ahora
+                        ]);
 
-                    Log::info("Mensaje enviado a {$cita->cliente_nombre}. Cita en {$minutosParaLaCita} min. (Límite plan: {$limitePlan})");
+                        //Registramos el cobro del crédito
+                        DB::table('creditos_whatsapp_negocio')->insert([
+                            'id_negocio' => $cita->id_negocio,
+                            'id_cita'    => $cita->id,
+                            'created_at' => $ahora,
+                            'updated_at' => $ahora
+                        ]);
+                    });
+
+                    Log::info("Mensaje exitoso a {$cita->cliente_nombre}. Crédito descontado.");
                 }
 
             } catch (\Exception $e) {
