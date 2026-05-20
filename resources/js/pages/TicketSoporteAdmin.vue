@@ -20,6 +20,9 @@ const ticketRevisar = reactive({
     id: '',
     asunto: '',
     negocio_nombre: '',
+    dueno_nombre: '',
+    dueno_email: '',
+    dueno_telefono: '',
     id_prioridad: '',
     id_estado: ''
 });
@@ -55,10 +58,15 @@ const cargarDatosTicketsGlobales = async () => {
 // ── Computed ───────────────────────────────────────────────────────────────────
 const ticketsFiltrados = computed(() => {
     return tickets.value.filter(ticket => {
-        // Ahora solo buscamos directamente en el asunto real de la BD
-        const coincideTexto = ticket.id.toLowerCase().includes(buscar.value.toLowerCase()) ||
-            ticket.asunto.toLowerCase().includes(buscar.value.toLowerCase()) ||
-            ticket.negocio_nombre.toLowerCase().includes(buscar.value.toLowerCase());
+        const busqueda = buscar.value.toLowerCase();
+
+        // Búsqueda ampliada: ID, Nombre del dueño, Email del dueño, Asunto o Negocio
+        const coincideTexto =
+            ticket.id.toLowerCase().includes(busqueda) ||
+            (ticket.dueno_nombre && ticket.dueno_nombre.toLowerCase().includes(busqueda)) ||
+            (ticket.dueno_email && ticket.dueno_email.toLowerCase().includes(busqueda)) ||
+            (ticket.asunto && ticket.asunto.toLowerCase().includes(busqueda)) ||
+            (ticket.negocio_nombre && ticket.negocio_nombre.toLowerCase().includes(busqueda));
 
         const coincideEstado = filtroEstado.value === '' || (ticket.id_estado && ticket.id_estado.toString() === filtroEstado.value);
         const coincidePrioridad = filtroPrioridad.value === '' || (ticket.id_prioridad && ticket.id_prioridad.toString() === filtroPrioridad.value);
@@ -70,11 +78,14 @@ const ticketsFiltrados = computed(() => {
 // ── Modal & Logic (Review Ticket) ─────────────────────────────────────────────
 const verTicket = (ticket) => {
     ticketRevisar.id = ticket.id;
-    // Asignamos directamente el asunto real que viene de la BD
     ticketRevisar.asunto = ticket.asunto;
     ticketRevisar.negocio_nombre = ticket.negocio_nombre;
+    ticketRevisar.dueno_nombre = ticket.dueno_nombre;
+    ticketRevisar.dueno_email = ticket.dueno_email;
+    ticketRevisar.dueno_telefono = ticket.dueno_telefono;
     ticketRevisar.id_prioridad = ticket.id_prioridad || '';
     ticketRevisar.id_estado = ticket.id_estado;
+
     mostrarModalRevisar.value = true;
 };
 
@@ -125,7 +136,7 @@ onMounted(() => {
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-dark">Bandeja de Tickets</h4>
-                <p class="text-muted small mb-0">Gestión de soporte</p>
+                <p class="text-muted small mb-0">Gestión central de soporte</p>
             </div>
         </div>
 
@@ -170,7 +181,7 @@ onMounted(() => {
                     <div class="col-md-4">
                         <div class="input-group shadow-sm rounded-3">
                             <span class="input-group-text bg-white border-end-0 text-muted">🔍</span>
-                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar por ID, asunto o negocio...">
+                            <input type="text" v-model="buscar" class="form-control border-start-0 bg-white" placeholder="Buscar por dueño, correo o ID...">
                         </div>
                     </div>
                     <div class="col-md-8 text-end">
@@ -196,7 +207,7 @@ onMounted(() => {
                         <thead class="bg-light">
                         <tr>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">ID Ticket</th>
-                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Asunto / Negocio</th>
+                            <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Usuario (Dueño)</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Prioridad</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0 text-center">Estado</th>
                             <th class="py-3 px-4 text-secondary fw-semibold border-bottom-0">Fecha</th>
@@ -207,10 +218,11 @@ onMounted(() => {
                         <tr v-for="ticket in ticketsFiltrados" :key="ticket.id" style="cursor: pointer;" @click="verTicket(ticket)">
                             <td class="px-4 py-3 fw-bold text-primary">{{ ticket.id }}</td>
                             <td class="px-4 py-3">
-                                <div class="fw-bold text-dark text-truncate" style="max-width: 300px;">
-                                    {{ ticket.asunto }}
+                                <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">
+                                    👤 {{ ticket.dueno_nombre }}
                                 </div>
-                                <div class="text-muted small">🏢 {{ ticket.negocio_nombre }}</div>
+                                <div class="text-muted small">✉️ {{ ticket.dueno_email }}</div>
+                                <div class="text-muted small">📞 {{ ticket.dueno_telefono || 'Sin teléfono' }}</div>
                             </td>
                             <td class="px-4 py-3 text-center">
                                     <span class="badge rounded-pill"
@@ -249,18 +261,27 @@ onMounted(() => {
             </div>
         </div>
 
-        <div v-if="mostrarModalRevisar" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div v-if="mostrarModalRevisar" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1050;">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-0 shadow-lg rounded-4">
-                    <div class="modal-header border-bottom-0 pb-0 px-4 pt-4">
+                    <div class="modal-header bg-light border-0 pb-3 px-4 pt-4">
                         <h5 class="modal-title fw-bold text-dark">Gestionar Ticket {{ ticketRevisar.id }}</h5>
                         <button type="button" class="btn-close shadow-none" @click="cerrarModalRevisar"></button>
                     </div>
 
                     <div class="modal-body px-4 py-4">
+                        <div class="mb-4 p-3 bg-primary bg-opacity-10 border border-primary border-opacity-25 rounded-3">
+                            <h6 class="fw-bold text-primary mb-2">Contacto del Dueño</h6>
+                            <p class="mb-1 small text-dark"><strong>👤 Nombre:</strong> {{ ticketRevisar.dueno_nombre }}</p>
+                            <p class="mb-1 small text-dark"><strong>✉️ Correo:</strong> {{ ticketRevisar.dueno_email }}</p>
+                            <p class="mb-0 small text-dark"><strong>📞 Teléfono:</strong> {{ ticketRevisar.dueno_telefono || 'No registrado' }}</p>
+                        </div>
+
                         <div class="mb-4 p-3 bg-light rounded-3 border">
-                            <p class="text-muted small mb-1">Negocio: <span class="fw-bold text-dark">{{ ticketRevisar.negocio_nombre }}</span></p>
-                            <p class="text-muted small mb-0">Asunto: <span class="fw-bold text-dark">{{ ticketRevisar.asunto }}</span></p>
+                            <p class="text-muted small mb-1">Negocio Afectado: <span class="fw-bold text-dark">{{ ticketRevisar.negocio_nombre }}</span></p>
+                            <hr class="my-2">
+                            <p class="text-muted small mb-0">Asunto del Ticket:</p>
+                            <p class="fw-bold text-dark mb-0" style="word-wrap: break-word;">{{ ticketRevisar.asunto }}</p>
                         </div>
 
                         <div class="mb-3">
@@ -273,7 +294,7 @@ onMounted(() => {
                             </select>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label class="form-label fw-semibold text-secondary">Actualizar Estado</label>
                             <select v-model="ticketRevisar.id_estado" class="form-select form-select-lg bg-light border-0 shadow-sm">
                                 <option v-for="estado in estadosTicket" :key="estado.id" :value="estado.id">
@@ -284,7 +305,9 @@ onMounted(() => {
                     </div>
 
                     <div class="modal-footer border-top-0 px-4 pb-4 pt-0 d-flex justify-content-end">
-                        <button type="button" class="btn btn-dark w-100 py-3 fw-bold fs-6 rounded-3" @click="actualizarTicket">Aplicar Cambios</button>
+                        <button type="button" class="btn btn-dark w-100 py-3 fw-bold fs-6 rounded-3 shadow-sm hover-shadow" @click="actualizarTicket">
+                            Aplicar Cambios
+                        </button>
                     </div>
                 </div>
             </div>

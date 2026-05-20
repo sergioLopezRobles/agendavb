@@ -60,9 +60,10 @@ class TicketController extends Controller
         $prioridades = DB::table('prioridad_ticket_soporte_usuarios_negocios')->get();
         $estados     = DB::table('estado_ticket_soporte_usuarios_negocios')->get();
 
-        // Aquí NO filtramos por usuario, traemos absolutamente todos los tickets
+        // 1. Agregamos el JOIN a users (u) y seleccionamos sus datos
         $tickets = DB::table('ticket_soporte_usuarios_negocios as t')
             ->join('negocios as n', 't.id_negocio', '=', 'n.id')
+            ->join('users as u', 't.id_usuario', '=', 'u.id') // <-- NUEVO JOIN
             ->leftJoin('prioridad_ticket_soporte_usuarios_negocios as p', 't.id_prioridad', '=', 'p.id')
             ->join('estado_ticket_soporte_usuarios_negocios as e', 't.id_estado', '=', 'e.id')
             ->leftJoin('preguntas_frecuentes_ticket as f', 't.id_pregunta', '=', 'f.id')
@@ -72,6 +73,9 @@ class TicketController extends Controller
                 't.id_estado',
                 't.id_prioridad',
                 'n.nombre as negocio_nombre',
+                'u.name as dueno_nombre',       
+                'u.email as dueno_email',
+                'u.telefono as dueno_telefono',
                 'p.descripcion as prioridad_nombre',
                 'e.descripcion as estado_nombre',
                 'f.pregunta as pregunta_nombre',

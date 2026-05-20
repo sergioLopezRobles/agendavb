@@ -61,7 +61,7 @@
             <div class="row align-items-center border-top pt-4 mt-2">
                 <div class="col-md-6 text-center text-md-start mb-3 mb-md-0">
                     <span class="text-muted small">
-                        © 2026 <span class="fw-bold text-primary">AgendaVB</span>. Creado por Vista Boreal. Todos los derechos reservados.
+                        © 2026 <span class="fw-bold text-primary">AgendaVB</span>. Creado por OGHS.
                     </span>
                 </div>
                 <div class="col-md-6 text-center text-md-end">
